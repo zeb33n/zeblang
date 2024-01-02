@@ -1,33 +1,11 @@
 use std::env;
-use std::fs::{read_to_string, File};
-use std::io::{Result, Write};
+use std::io::Result;
 
-#[derive(Debug, Clone)]
-enum TokenKind {
-    Return,
-    Assign,
-    EndLine,
-    VarName(String),
-    Int(String),
-    Operator(String),
-}
+mod tokenizer;
+use tokenizer::{tokenize, TokenKind};
 
-fn tokenize_str(token_str: &str) -> TokenKind {
-    match token_str {
-        "return" => TokenKind::Return,
-        "=" => TokenKind::Assign,
-        "+" | "-" | "/" | "*" => TokenKind::Operator(token_str.to_string()),
-        value if value.chars().all(char::is_numeric) => TokenKind::Int(value.to_string()),
-        value if value.chars().all(char::is_alphanumeric) => TokenKind::VarName(value.to_string()),
-        bad_token => panic!("bad token {}", bad_token),
-    }
-}
-
-fn tokenize(code: Vec<String>) -> Vec<Vec<TokenKind>> {
-    code.into_iter()
-        .map(|line| line.split_ascii_whitespace().map(tokenize_str).collect())
-        .collect()
-}
+mod local_client;
+use local_client::{read_file, write_assembly_file};
 
 fn tokens_to_assembly(lines: Vec<Vec<TokenKind>>) -> String {
     let mut output = String::from("global _start\n_start:\n");
@@ -42,19 +20,6 @@ fn tokens_to_assembly(lines: Vec<Vec<TokenKind>>) -> String {
         }
     }
     output
-}
-
-fn read_file(filename: &str) -> Vec<String> {
-    match read_to_string(filename) {
-        Ok(value) => value.lines().map(str::to_string).collect(),
-        Err(e) => panic!("Error reading file: {}", e),
-    }
-}
-
-fn write_assembly_file(filename: &str, body: String) -> Result<()> {
-    let mut file = File::create(format!("{}{}", filename.split(".").next().unwrap(), ".asm"))?;
-    file.write_all(body.as_bytes())?;
-    Ok(())
 }
 
 fn main() -> Result<()> {
