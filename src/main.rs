@@ -16,30 +16,20 @@ fn tokenize_str(token_str: &str) -> TokenKind {
     match token_str {
         "return" => TokenKind::Return,
         "=" => TokenKind::Assign,
-        ";" => TokenKind::EndLine,
         "+" | "-" | "/" | "*" => TokenKind::Operator(token_str.to_string()),
         value if value.chars().all(char::is_numeric) => TokenKind::Int(value.to_string()),
         value if value.chars().all(char::is_alphanumeric) => TokenKind::VarName(value.to_string()),
-        bad_token => panic!("bad token {}", bad_token), //value => match value.chars().,
+        bad_token => panic!("bad token {}", bad_token),
     }
 }
 
-fn tokenize(code: String) -> Vec<TokenKind> {
-    code.split_ascii_whitespace().map(tokenize_str).collect()
+fn tokenize(code: Vec<String>) -> Vec<Vec<TokenKind>> {
+    code.into_iter()
+        .map(|line| line.split_ascii_whitespace().map(tokenize_str).collect())
+        .collect()
 }
 
-fn tokens_to_assembly(tokens: Vec<TokenKind>) -> String {
-    let mut lines: Vec<Vec<TokenKind>> = Vec::new();
-    let mut line = Vec::new();
-    for token in tokens.into_iter() {
-        match token {
-            TokenKind::EndLine => {
-                lines.push(line.clone());
-                line.retain(|_| false);
-            }
-            other => line.push(other),
-        }
-    }
+fn tokens_to_assembly(lines: Vec<Vec<TokenKind>>) -> String {
     let mut output = String::from("global _start\n_start:\n");
     for line in lines.into_iter() {
         match &line[..] {
@@ -54,9 +44,9 @@ fn tokens_to_assembly(tokens: Vec<TokenKind>) -> String {
     output
 }
 
-fn read_file(filename: &str) -> String {
+fn read_file(filename: &str) -> Vec<String> {
     match read_to_string(filename) {
-        Ok(value) => value,
+        Ok(value) => value.lines().map(str::to_string).collect(),
         Err(e) => panic!("Error reading file: {}", e),
     }
 }
@@ -73,23 +63,7 @@ fn main() -> Result<()> {
         [_, filename] => filename,
         _ => panic!("incorrect usage. correct usage is: \nzeb <file.zb>"),
     };
-    let code: String = read_file(filename);
-
+    let code = read_file(filename);
     write_assembly_file(&filename, tokens_to_assembly(tokenize(code)))?;
     Ok(())
 }
-
-//#[derive(Debug)]
-//struct Token {
-//kind: TokenKind,
-//value: String,
-//}
-
-//impl Token {
-//fn new(kind: TokenKind, value: Option<String>) -> Self {
-//Self {
-//kind: kind,
-//value: value.unwrap_or("".to_string()),
-//}
-//}
-//}
