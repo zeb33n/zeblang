@@ -10,6 +10,8 @@ use local_client::{read_file, write_assembly_file};
 mod parser;
 use parser::parse;
 
+mod error;
+
 fn tokens_to_assembly(line: Vec<TokenKind>) -> String {
     let mut output = String::from("global _start\n_start:\n");
     match &line[..] {
@@ -30,6 +32,7 @@ fn main() -> Result<()> {
         _ => panic!("incorrect usage. correct usage is: \nzeb <file.zb>"),
     };
     let code = read_file(filename);
-    write_assembly_file(&filename, tokens_to_assembly(tokenize(code)))?;
+    dbg!(parse(tokenize(code)));
+    //write_assembly_file(&filename, tokens_to_assembly(tokenize(code)))?;
     Ok(())
 }

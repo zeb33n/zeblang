@@ -1,6 +1,9 @@
-use std::io::{Error, Result};
+use std::io::Result;
+use std::io::{Error, ErrorKind};
 
 use crate::tokenizer::TokenKind;
+
+use crate::error::new_error;
 
 #[derive(Debug)]
 struct ExpressionNode {
@@ -30,12 +33,22 @@ fn parse_expression(value: String) -> ExpressionNode {
     ExpressionNode::new(value)
 }
 
-pub fn parse(tokenised_code: Vec<TokenKind>) -> Option<ReturnNode> {
-    let mut iterator = tokenised_code.into_iter();
-    match (iterator.next().unwrap(), iterator.next().unwrap()) {
+fn do_parsing(mut iterator: std::vec::IntoIter<TokenKind>) -> Result<ReturnNode> {
+    match (
+        iterator.next().ok_or_else(|| new_error("syntax error"))?,
+        iterator.next().ok_or_else(|| new_error("syntax error"))?,
+    ) {
         (crate::TokenKind::Return, crate::TokenKind::Int(value)) => {
-            Some(ReturnNode::new(parse_expression(value)))
+            Ok(ReturnNode::new(parse_expression(value)))
         }
-        _ => None,
+        _ => do_parsing(iterator),
+    }
+}
+
+pub fn parse(tokenised_code: Vec<TokenKind>) -> ReturnNode {
+    let iterator = tokenised_code.into_iter();
+    match do_parsing(iterator) {
+        Ok(return_node) => return_node,
+        Err(e) => panic!("{}", e),
     }
 }
