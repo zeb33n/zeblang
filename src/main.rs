@@ -12,18 +12,8 @@ use parser::parse;
 
 mod error;
 
-fn tokens_to_assembly(line: Vec<TokenKind>) -> String {
-    let mut output = String::from("global _start\n_start:\n");
-    match &line[..] {
-        [.., TokenKind::Return, TokenKind::Int(value), TokenKind::EndLine] => {
-            output += "   mov rax, 60\n";
-            output += format!("   mov rdi, {}\n", value).as_str();
-            output += "   syscall";
-        }
-        _ => panic!("syntax error"),
-    }
-    output
-}
+mod generator;
+use generator::generate;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -32,7 +22,6 @@ fn main() -> Result<()> {
         _ => panic!("incorrect usage. correct usage is: \nzeb <file.zb>"),
     };
     let code = read_file(filename);
-    dbg!(parse(tokenize(code)));
-    //write_assembly_file(&filename, tokens_to_assembly(tokenize(code)))?;
+    write_assembly_file(&filename, generate(parse(tokenize(code))))?;
     Ok(())
 }
