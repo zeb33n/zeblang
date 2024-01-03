@@ -1,2 +1,2 @@
 # ZebLang!
-Welcome to zeblang! WIP 
+Welcome to a very basic programming language WIP 
