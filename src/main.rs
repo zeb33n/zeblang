@@ -7,17 +7,18 @@ use tokenizer::{tokenize, TokenKind};
 mod local_client;
 use local_client::{read_file, write_assembly_file};
 
-fn tokens_to_assembly(lines: Vec<Vec<TokenKind>>) -> String {
+mod parser;
+use parser::parse;
+
+fn tokens_to_assembly(line: Vec<TokenKind>) -> String {
     let mut output = String::from("global _start\n_start:\n");
-    for line in lines.into_iter() {
-        match &line[..] {
-            [TokenKind::Return, TokenKind::Int(value)] => {
-                output += "   mov rax, 60\n";
-                output += format!("   mov rdi, {}\n", value).as_str();
-                output += "   syscall";
-            }
-            _ => panic!("syntax error"),
+    match &line[..] {
+        [.., TokenKind::Return, TokenKind::Int(value), TokenKind::EndLine] => {
+            output += "   mov rax, 60\n";
+            output += format!("   mov rdi, {}\n", value).as_str();
+            output += "   syscall";
         }
+        _ => panic!("syntax error"),
     }
     output
 }
