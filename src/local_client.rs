@@ -4,7 +4,6 @@ use std::io::{Result, Write};
 pub fn read_file(filename: &str) -> String {
     match read_to_string(filename) {
         Ok(value) => format!("{}{}", value.replace("\n", " ; "), " ;"),
-        //Ok(value) => value.lines().map(str::to_string).collect(),
         Err(e) => panic!("Error reading file: {}", e),
     }
 }

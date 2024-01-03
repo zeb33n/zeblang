@@ -22,7 +22,4 @@ fn tokenize_str(token_str: &str) -> TokenKind {
 
 pub fn tokenize(code: String) -> Vec<TokenKind> {
     code.split_ascii_whitespace().map(tokenize_str).collect()
-    //code.into_iter()
-    //.map(|line| line.split_ascii_whitespace().map(tokenize_str).collect())
-    //.collect()
 }
