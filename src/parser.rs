@@ -14,15 +14,15 @@ pub struct ExpressionNode {
     pub integer: String,
 }
 
+#[derive(Debug)]
+pub struct ReturnNode {
+    pub expression: Box<Node>,
+}
+
 impl ExpressionNode {
     fn new(integer: String) -> Self {
         Self { integer: integer }
     }
-}
-
-#[derive(Debug)]
-pub struct ReturnNode {
-    pub expression: Box<Node>,
 }
 
 impl ReturnNode {
