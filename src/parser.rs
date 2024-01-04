@@ -3,10 +3,12 @@ use std::io::Result;
 use crate::error::new_error;
 use crate::tokenizer::TokenKind;
 
+use std::vec::IntoIter;
+
 #[derive(Debug)]
 pub enum StatementNode {
     Exit(ExitNode),
-    Expression(ExpressionNode),
+    Assign(String, AssignNode),
 }
 
 #[derive(Debug)]
@@ -15,24 +17,13 @@ pub enum ExitNode {
 }
 
 #[derive(Debug)]
+pub enum AssignNode {
+    Expression(ExpressionNode),
+}
+
+#[derive(Debug)]
 pub enum ExpressionNode {
     Value(String),
-}
-
-fn parse_expression(value: String) -> ExpressionNode {
-    ExpressionNode::Value(value)
-}
-
-fn do_parsing(mut iterator: std::vec::IntoIter<TokenKind>) -> Result<StatementNode> {
-    match (
-        iterator.next().ok_or_else(|| new_error("syntax error"))?,
-        iterator.next().ok_or_else(|| new_error("syntax error"))?,
-    ) {
-        (crate::TokenKind::Exit, crate::TokenKind::Int(value)) => Ok(StatementNode::Exit(
-            ExitNode::Expression(parse_expression(value)),
-        )),
-        _ => do_parsing(iterator),
-    }
 }
 
 pub fn parse(tokenised_code: Vec<TokenKind>) -> StatementNode {
@@ -43,38 +34,57 @@ pub fn parse(tokenised_code: Vec<TokenKind>) -> StatementNode {
     }
 }
 
-//pub enum Node {
-//Expression(ExpressionNode),
-//Exit(ExitNode),
-//Statement(StatementNode),
-//}
+// this only makes one statement per program. we should return a vector of statements
+fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
+    let current_token = iterator.next().ok_or_else(|| new_error("syntax error"))?;
+    match current_token {
+        crate::TokenKind::Exit | crate::TokenKind::VarName(_) => {
+            parse_statement(current_token, iterator)
+        }
+        _ => do_parsing(iterator),
+    }
+}
 
-//#[derive(Debug)]
-//pub struct StatementNode {
-//pub exit: Box<Node>,
-//pub expression: Box<Node>
-//}
+fn parse_statement(
+    current_token: TokenKind,
+    iterator: IntoIter<TokenKind>,
+) -> Result<StatementNode> {
+    match current_token {
+        TokenKind::Exit => Ok(StatementNode::Exit(parse_exit(iterator)?)),
+        TokenKind::VarName(ref name) => Ok(StatementNode::Assign(
+            name.to_owned(),
+            parse_assign(iterator)?,
+        )),
+        _ => Err(new_error("syntax error")),
+    }
+}
 
-//#[derive(Debug)]
-//pub struct ExitNode {
-//pub expression: Box<Node>,
-//}
+fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
+    let current_token = iterator
+        .next()
+        .ok_or_else(|| new_error("syntax error: no equals"))?;
+    match current_token {
+        TokenKind::Assign => {
+            let current_token = iterator
+                .next()
+                .ok_or_else(|| new_error("syntax error: no equals"))?;
+            Ok(AssignNode::Expression(parse_expression(current_token)?))
+        }
+        _ => Err(new_error("Invalid Token")),
+    }
+}
 
-//#[derive(Debug)]
-//pub struct ExpressionNode {
-//pub integer: String,
-//}
+fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
+    let err_msg = "syntax error: no exit value";
+    let current_token = iterator.next().ok_or_else(|| new_error(err_msg))?;
+    Ok(ExitNode::Expression(parse_expression(current_token)?))
+}
 
-//impl ExpressionNode {
-//fn new(integer: String) -> Self {
-//Self { integer: integer }
-//}
-//}
+fn parse_expression(current_token: TokenKind) -> Result<ExpressionNode> {
+    match current_token {
+        TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
+        _ => Err(new_error("syntax error: invalid expression")),
+    }
+}
 
-//impl ExitNode {
-//fn new(expression: Node) -> Self {
-//Self {
-//expression: Box::new(expression),
-//}
-//}
-//}
+//iterator.peek().ok_or_else(|| new_error("syntax error"))?,

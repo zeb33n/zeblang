@@ -1,8 +1,8 @@
 use crate::parser::{ExitNode, ExpressionNode, StatementNode};
 
-pub fn generate(node: StatementNode) -> String {
+pub fn generate(program: StatementNode) -> String {
     let mut output = String::from("global _start\n_start:\n");
-    match node {
+    match program {
         StatementNode::Exit(exit_node) => {
             let ExitNode::Expression(expr_node) = exit_node;
             output += "   mov rax, 60\n";
