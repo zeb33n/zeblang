@@ -25,10 +25,10 @@ pub enum AssignNode {
 pub enum ExpressionNode {
     Value(String),
     Var(String),
-    Infix(Box<ExpressionNode>, Box<ExpressionNode>, String),
+    Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
 }
 
-// can be refactored to use .map()
+// can be refactored to use .map()?
 pub fn parse(tokenised_code: Vec<TokenKind>) -> Vec<StatementNode> {
     let lines = tokenised_code
         .split(|token| match token {
@@ -134,10 +134,42 @@ fn do_parse_expression(
                     .ok_or(new_error("syntax error: wrong use of infix"))?,
                 iterator,
             )?;
+            //
+            // this wont work for operator presidance
+            //
+            // 1 - (2 * 3) + (4 / 5)
+            //
+            // should transforms into:
+            //
+            // expr(
+            //     expr(
+            //         1
+            //         -
+            //         expr(
+            //             2
+            //             *
+            //             3
+            //         )
+            //     +
+            //     expr(
+            //         4
+            //         /
+            //         5
+            // )
+            //
+            //
+            // Infix(expr, op, expr) -> this works as data structure
+            //
+            // when you multiply or divide you look for another
+            // multiply or divide if it doesnt exist you kill that branch
+            // and go back to the last plus or minus. I think its like a
+            // nested version of what I already have. Rust wont let me
+            // miss any edge cases :)
+            //
             Ok(ExpressionNode::Infix(
                 Box::new(current_node),
-                Box::new(expression),
                 infix.to_owned(),
+                Box::new(expression),
             ))
         }
         None => Ok(current_node),
@@ -146,5 +178,5 @@ fn do_parse_expression(
 
 // where do i get T from
 //fn syntax_error() -> Result<T> {
-    //Err(new_error("syntax error: balse"))
+//Err(new_error("syntax error: balse"))
 //}
