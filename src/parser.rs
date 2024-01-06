@@ -3,7 +3,7 @@ use std::io::Result;
 use crate::error::new_error;
 use crate::tokenizer::TokenKind;
 
-use std::slice::Iter;
+use std::vec::IntoIter;
 
 #[derive(Debug)]
 pub enum StatementNode {
@@ -28,27 +28,12 @@ pub enum ExpressionNode {
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
 }
 
-// can be refactored to use .map()?
-pub fn parse(tokenised_code: Vec<TokenKind>) -> Vec<StatementNode> {
-    let lines = tokenised_code
-        .split(|token| match token {
-            TokenKind::EndLine => true,
-            _ => false,
-        })
-        .collect::<Vec<&[TokenKind]>>();
-
-    let mut out: Vec<StatementNode> = Vec::new();
-    for line in lines.into_iter() {
-        let iterator = line.into_iter();
-        match do_parsing(iterator) {
-            Ok(statement_node) => out.push(statement_node),
-            Err(e) => panic!("{}", e),
-        }
-    }
-    out
+pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
+    let iterator = line.into_iter();
+    do_parsing(iterator)
 }
 
-fn do_parsing(mut iterator: Iter<'_, TokenKind>) -> Result<StatementNode> {
+fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
     let current_token = iterator.next().ok_or_else(|| new_error("syntax error"))?;
     match current_token {
         crate::TokenKind::Exit | crate::TokenKind::VarName(_) => {
@@ -59,20 +44,17 @@ fn do_parsing(mut iterator: Iter<'_, TokenKind>) -> Result<StatementNode> {
 }
 
 fn parse_statement(
-    current_token: &TokenKind,
-    iterator: Iter<'_, TokenKind>,
+    current_token: TokenKind,
+    iterator: IntoIter<TokenKind>,
 ) -> Result<StatementNode> {
     match current_token {
         TokenKind::Exit => Ok(StatementNode::Exit(parse_exit(iterator)?)),
-        TokenKind::VarName(ref name) => Ok(StatementNode::Assign(
-            name.to_owned(),
-            parse_assign(iterator)?,
-        )),
+        TokenKind::VarName(name) => Ok(StatementNode::Assign(name, parse_assign(iterator)?)),
         _ => Err(new_error("syntax error:")),
     }
 }
 
-fn parse_assign(mut iterator: Iter<'_, TokenKind>) -> Result<AssignNode> {
+fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
     let current_token = iterator
         .next()
         .ok_or_else(|| new_error("syntax error: no equals"))?;
@@ -90,7 +72,7 @@ fn parse_assign(mut iterator: Iter<'_, TokenKind>) -> Result<AssignNode> {
     }
 }
 
-fn parse_exit(mut iterator: Iter<'_, TokenKind>) -> Result<ExitNode> {
+fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
     let err_msg = "syntax error: no exit value";
     let current_token = iterator.next().ok_or_else(|| new_error(err_msg))?;
     Ok(ExitNode::Expression(parse_expression(
@@ -100,8 +82,8 @@ fn parse_exit(mut iterator: Iter<'_, TokenKind>) -> Result<ExitNode> {
 }
 
 fn parse_expression(
-    current_token: &TokenKind,
-    iterator: Iter<'_, TokenKind>,
+    current_token: TokenKind,
+    iterator: IntoIter<TokenKind>,
 ) -> Result<ExpressionNode> {
     match current_token {
         TokenKind::Int(_) => do_parse_expression(current_token, iterator),
@@ -112,12 +94,12 @@ fn parse_expression(
 
 //this can be better abstract out the different cases and parse them individualy?
 fn do_parse_expression(
-    current_token: &TokenKind,
-    mut iterator: Iter<'_, TokenKind>,
+    current_token: TokenKind,
+    mut iterator: IntoIter<TokenKind>,
 ) -> Result<ExpressionNode> {
     let current_node = match current_token {
-        TokenKind::Int(value) => Ok(ExpressionNode::Value(value.to_owned())),
-        TokenKind::VarName(name) => Ok(ExpressionNode::Var(name.to_owned())),
+        TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
+        TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
         _ => Err(new_error("syntax error: balse")),
     }?;
 
@@ -168,7 +150,7 @@ fn do_parse_expression(
             //
             Ok(ExpressionNode::Infix(
                 Box::new(current_node),
-                infix.to_owned(),
+                infix,
                 Box::new(expression),
             ))
         }

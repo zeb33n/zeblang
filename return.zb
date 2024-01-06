@@ -1,4 +1,4 @@
 y = 1
 x = 3 + 4 - y / 4
-z = 3 * x * y
-exit z
+z = 3 * x * 3 
+exit hello

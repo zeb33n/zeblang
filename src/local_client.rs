@@ -1,9 +1,9 @@
 use std::fs::{read_to_string, File};
 use std::io::{Result, Write};
 
-pub fn read_file(filename: &str) -> String {
+pub fn read_file(filename: &str) -> Vec<String> {
     match read_to_string(filename) {
-        Ok(value) => value.replace("\n", " ; "),
+        Ok(value) => value.lines().map(|line| line.to_string()).collect(),
         Err(e) => panic!("Error reading file: {}", e),
     }
 }
