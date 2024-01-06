@@ -1,25 +1,25 @@
-use crate::parser::Node;
+use crate::parser::{ExitNode, ExpressionNode, StatementNode};
 
-pub fn generate(node: Node) -> String {
+pub fn generate(program: Vec<StatementNode>) -> String {
+    dbg!(&program);
     let mut output = String::from("global _start\n_start:\n");
-    match node {
-        Node::Return(return_node) => {
-            output += "   mov rax, 60\n";
-            output += format!(
-                "   mov rdi, {}\n",
-                generate_expression(*return_node.expression)
-            )
-            .as_str();
-            output += "   syscall";
-        }
-        _ => panic!("syntax error"),
-    };
+    for line in program.into_iter() {
+        match line {
+            StatementNode::Exit(exit_node) => {
+                let ExitNode::Expression(expr_node) = exit_node;
+                output += "   mov rax, 60\n";
+                output += format!("   mov rdi, {}\n", generate_expression(expr_node)).as_str();
+                output += "   syscall";
+            }
+            _ => panic!("syntax error"),
+        };
+    }
     output
 }
 
-fn generate_expression(node: Node) -> String {
-    match node {
-        Node::Expression(expression_node) => expression_node.integer,
-        _ => panic!("syntax error"),
-    }
+fn generate_expression(expr: ExpressionNode) -> String {
+    let ExpressionNode::Value(value) = expr else {
+        todo!()
+    };
+    value
 }

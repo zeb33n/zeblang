@@ -1,6 +1,6 @@
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum TokenKind {
-    Return,
+    Exit,
     Assign,
     EndLine,
     VarName(String),
@@ -10,7 +10,7 @@ pub enum TokenKind {
 
 fn tokenize_str(token_str: &str) -> TokenKind {
     match token_str {
-        "return" => TokenKind::Return,
+        "exit" => TokenKind::Exit,
         "=" => TokenKind::Assign,
         ";" => TokenKind::EndLine,
         "+" | "-" | "/" | "*" => TokenKind::Operator(token_str.to_string()),
