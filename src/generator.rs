@@ -1,25 +1,89 @@
-use crate::parser::{ExitNode, ExpressionNode, StatementNode};
+use crate::parser::{AssignNode, ExitNode, ExpressionNode, StatementNode};
+
+use std::collections::HashMap;
+
+#[derive(Debug)]
+struct AssemblyData {
+    assembly: String,
+    stack_pointer: usize,
+}
+
+impl AssemblyData {
+    fn new() -> Self {
+        Self {
+            assembly: String::from("global _start\n_start:\n"),
+            stack_pointer: 0,
+        }
+    }
+
+    fn indent(level: usize) -> String {
+        "    ".repeat(level).to_string()
+    }
+
+    fn push(&mut self, register: &str, level: usize) -> () {
+        self.assembly += format!("{}push {}\n", Self::indent(level), register).as_str();
+        self.stack_pointer += 1;
+    }
+
+    fn pop(&mut self, register: &str, level: usize) -> () {
+        self.assembly += format!("{}pop {}\n", Self::indent(level), register).as_str();
+        self.stack_pointer -= 1;
+    }
+
+    fn generic(&mut self, cmd: &str, level: usize) -> () {
+        self.assembly += format!("{}{}\n", Self::indent(level), cmd).as_str();
+    }
+}
 
 pub fn generate(program: Vec<StatementNode>) -> String {
-    dbg!(&program);
-    let mut output = String::from("global _start\n_start:\n");
+    let mut assembly_data = AssemblyData::new();
+    let mut variables: HashMap<String, usize> = HashMap::new();
     for line in program.into_iter() {
         match line {
             StatementNode::Exit(exit_node) => {
                 let ExitNode::Expression(expr_node) = exit_node;
-                output += "   mov rax, 60\n";
-                output += format!("   mov rdi, {}\n", generate_expression(expr_node)).as_str();
-                output += "   syscall";
+                let value = generate_expr(expr_node, &variables, &assembly_data.stack_pointer);
+                assembly_data.generic(format!("mov rax, {}", value).as_str(), 1);
+                assembly_data.push("rax", 1);
+                assembly_data.generic("mov rax, 60", 1);
+                assembly_data.pop("rdi", 1);
+                assembly_data.generic("syscall", 1);
             }
-            _ => panic!("syntax error"),
+            StatementNode::Assign(name, assign_node) => {
+                variables.insert(name, assembly_data.stack_pointer);
+                let AssignNode::Expression(expr_node) = assign_node;
+                let value = generate_expr(expr_node, &variables, &assembly_data.stack_pointer);
+                assembly_data.generic(format!("mov rax, {}", value).as_str(), 1);
+                assembly_data.push("rax", 1);
+            }
         };
     }
-    output
+    assembly_data.assembly
 }
 
-fn generate_expression(expr: ExpressionNode) -> String {
-    let ExpressionNode::Value(value) = expr else {
-        todo!()
-    };
-    value
+// hash set of vars.
+fn generate_expr(
+    expr: ExpressionNode,
+    variables: &HashMap<String, usize>,
+    stack_position: &usize,
+) -> String {
+    match expr {
+        ExpressionNode::Value(value) => value,
+        ExpressionNode::Var(value) => {
+            let variable_position = variables.get(&value).unwrap();
+            format!("[rsp + {}]", (stack_position - variable_position - 1) * 8)
+        }
+        ExpressionNode::Infix(_, _, _) => todo!("not implemented"),
+    }
 }
+
+// push rax, [rsp + x]
+// when we get an assign we need to mov value to the stack.
+
+// mov rax value
+// push rax
+// mov rax 60
+// pop rdi
+// syscall
+
+// rsp stack pointer register
