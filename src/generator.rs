@@ -61,7 +61,6 @@ pub fn generate(program: Vec<StatementNode>) -> String {
     assembly_data.assembly
 }
 
-// hash set of vars.
 fn generate_expr(
     expr: ExpressionNode,
     variables: &HashMap<String, usize>,
@@ -76,14 +75,3 @@ fn generate_expr(
         ExpressionNode::Infix(_, _, _) => todo!("not implemented"),
     }
 }
-
-// push rax, [rsp + x]
-// when we get an assign we need to mov value to the stack.
-
-// mov rax value
-// push rax
-// mov rax 60
-// pop rdi
-// syscall
-
-// rsp stack pointer register
