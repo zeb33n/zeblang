@@ -13,7 +13,7 @@ use parser::{parse, StatementNode};
 mod error;
 
 mod generator;
-use generator::generate;
+use generator::Generator;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -26,7 +26,8 @@ fn main() -> Result<()> {
         .into_iter()
         .map(|line| parse(tokenize(line)).unwrap())
         .collect();
-    let assembly = generate(parse_tree);
+    let mut generator = Generator::new();
+    let assembly = generator.generate(parse_tree);
     write_assembly_file(&filename, assembly)?;
     Ok(())
 }
