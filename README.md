@@ -16,3 +16,26 @@ x = 2
 exit x
 ```
 exits with exit code 2
+### Adding
+Add stuff together!
+```
+x = 1 + 1
+exit x
+```
+exits with 2
+
+Add as much stuff as you like!
+```
+x = 1 + 2 + 3 + 4
+exit x
+```
+exits with 10
+
+Add variables !
+```
+x = 1
+y = 2
+exit x + y
+```
+exits with 3
+
