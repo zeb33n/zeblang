@@ -1,5 +1,4 @@
-x = 69
-y = x
-out = y
-z = 1
-exit out
+five = 5
+x = five + five 
+y = 1 + 2 + 3 + 4
+exit x + y

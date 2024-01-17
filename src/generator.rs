@@ -3,16 +3,18 @@ use crate::parser::{AssignNode, ExitNode, ExpressionNode, StatementNode};
 use std::collections::HashMap;
 
 #[derive(Debug)]
-struct AssemblyData {
+pub struct Generator {
     assembly: String,
     stack_pointer: usize,
+    variables: HashMap<String, usize>,
 }
 
-impl AssemblyData {
-    fn new() -> Self {
+impl Generator {
+    pub fn new() -> Self {
         Self {
             assembly: String::from("global _start\n_start:\n"),
             stack_pointer: 0,
+            variables: HashMap::new(),
         }
     }
 
@@ -33,45 +35,60 @@ impl AssemblyData {
     fn generic(&mut self, cmd: &str, level: usize) -> () {
         self.assembly += format!("{}{}\n", Self::indent(level), cmd).as_str();
     }
-}
 
-pub fn generate(program: Vec<StatementNode>) -> String {
-    let mut assembly_data = AssemblyData::new();
-    let mut variables: HashMap<String, usize> = HashMap::new();
-    for line in program.into_iter() {
-        match line {
-            StatementNode::Exit(exit_node) => {
-                let ExitNode::Expression(expr_node) = exit_node;
-                let value = generate_expr(expr_node, &variables, &assembly_data.stack_pointer);
-                assembly_data.generic(format!("mov rax, {}", value).as_str(), 1);
-                assembly_data.push("rax", 1);
-                assembly_data.generic("mov rax, 60", 1);
-                assembly_data.pop("rdi", 1);
-                assembly_data.generic("syscall", 1);
+    fn generate_expr(&mut self, expr: ExpressionNode) -> () {
+        match expr {
+            ExpressionNode::Value(value) => {
+                self.generic(format!("mov rax, {}", value).as_str(), 1);
+                self.push("rax", 1);
             }
-            StatementNode::Assign(name, assign_node) => {
-                variables.insert(name, assembly_data.stack_pointer);
-                let AssignNode::Expression(expr_node) = assign_node;
-                let value = generate_expr(expr_node, &variables, &assembly_data.stack_pointer);
-                assembly_data.generic(format!("mov rax, {}", value).as_str(), 1);
-                assembly_data.push("rax", 1);
+            ExpressionNode::Var(value) => {
+                let variable_position = self.variables.get(&value).unwrap();
+                let var = format!(
+                    "[rsp + {}]",
+                    (self.stack_pointer - variable_position - 1) * 8
+                );
+                self.generic(format!("mov rax, {}", var).as_str(), 1);
+                self.push("rax", 1);
             }
-        };
-    }
-    assembly_data.assembly
-}
-
-fn generate_expr(
-    expr: ExpressionNode,
-    variables: &HashMap<String, usize>,
-    stack_position: &usize,
-) -> String {
-    match expr {
-        ExpressionNode::Value(value) => value,
-        ExpressionNode::Var(value) => {
-            let variable_position = variables.get(&value).unwrap();
-            format!("[rsp + {}]", (stack_position - variable_position - 1) * 8)
+            ExpressionNode::Infix(expr_1, _op, expr_2) => {
+                self.generate_expr(*expr_1);
+                self.generate_expr(*expr_2);
+                self.pop("rax", 1);
+                self.pop("rbx", 1);
+                self.generic("add rax, rbx", 1);
+                self.push("rax", 1);
+            }
         }
-        ExpressionNode::Infix(_, _, _) => todo!("not implemented"),
+    }
+
+    pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
+        for line in program.into_iter() {
+            match line {
+                StatementNode::Exit(exit_node) => {
+                    let ExitNode::Expression(expr_node) = exit_node;
+                    self.generate_expr(expr_node);
+                    self.generic("mov rax, 60", 1);
+                    self.pop("rdi", 1);
+                    self.generic("syscall", 1);
+                }
+                StatementNode::Assign(name, assign_node) => {
+                    self.variables.insert(name, self.stack_pointer);
+                    let AssignNode::Expression(expr_node) = assign_node;
+                    self.generate_expr(expr_node);
+                }
+            };
+        }
+        self.assembly.to_owned()
     }
 }
+//
+//global _start
+//_start:
+//    mov rax, 2
+//    mov rbx, 3
+//    add rax, rbx
+//    push rax
+//    mov rax, 60
+//    pop rdi
+//    syscall
