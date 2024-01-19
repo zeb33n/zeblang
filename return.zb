@@ -1,4 +1,2 @@
-five = 5
-x = five + five 
-y = 1 + 2 + 3 + 4
-exit x + y
+y = 1 + 2 + 3 * 4 + 5
+exit y
