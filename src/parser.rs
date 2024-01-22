@@ -83,14 +83,56 @@ fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
 
 struct ExpressionParser {
     iterator: IntoIter<TokenKind>,
-    current_precidence: u8,
+    current_precedence: u8,
 }
 
 impl ExpressionParser {
     fn new(iterator: IntoIter<TokenKind>) -> Self {
         Self {
             iterator: iterator,
-            current_precidence: 1,
+            current_precedence: 1,
+        }
+    }
+
+    fn parse_expression(&mut self, current_token: TokenKind) -> Result<ExpressionNode> {
+        let mut expr = match current_token {
+            TokenKind::Int(_) => Self::parse_expression_token(current_token),
+            TokenKind::VarName(_) => Self::parse_expression_token(current_token),
+            _ => Err(new_error("syntax error: invalid expression")),
+        };
+        let op_token = match self.iterator.next() {
+            Some(op_token) => op_token,
+            None => {
+                return expr;
+            }
+        };
+
+        loop {
+            let infix = match op_token {
+                TokenKind::Operator(ref infix) => Ok(infix.as_str()),
+                _ => Err(new_error("syntax error: invalid expression")),
+            }?;
+            let precedence: u8 = match infix {
+                "+" | "-" => Ok(1),
+                "*" | "/" => Ok(2),
+                _ => Err(new_error("syntax error: unknown operator")),
+            }?;
+            //infix is overwritten because of this
+            if precedence < self.current_precedence {
+                self.current_precedence = 1;
+                break expr;
+            }
+            // is there another
+            let next_token = match self.iterator.next() {
+                Some(token) => token,
+                None => {
+                    self.current_precedence = 1;
+                    break expr;
+                }
+            };
+            self.current_precedence = precedence;
+            let rh_expr = self.parse_expression(next_token);
+            expr = Ok(Self::make_infix(expr?, rh_expr?, infix.to_string()));
         }
     }
 
@@ -99,51 +141,6 @@ impl ExpressionParser {
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
             TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
             _ => Err(new_error("syntax error: balse")),
-        }
-    }
-
-    fn parse_expression(&mut self, current_token: TokenKind) -> Result<ExpressionNode> {
-        let expr = match current_token {
-            TokenKind::Int(_) => Self::parse_expression_token(current_token),
-            TokenKind::VarName(_) => Self::parse_expression_token(current_token),
-            _ => Err(new_error("syntax error: invalid expression")),
-        };
-        match self.iterator.next() {
-            Some(next_token) => self.parse_expression_infix(next_token, expr),
-            None => expr,
-        }
-    }
-
-    fn parse_expression_infix(
-        &mut self,
-        current_token: TokenKind,
-        mut expr: Result<ExpressionNode>,
-    ) -> Result<ExpressionNode> {
-        loop {
-            let infix = match current_token {
-                TokenKind::Operator(ref infix) => Ok(infix.as_str()),
-                _ => Err(new_error("syntax error: invalid expression")),
-            }?;
-            let precidance: u8 = match infix {
-                "+" | "-" => Ok(1),
-                "*" | "/" => Ok(2),
-                _ => Err(new_error("syntax error: unknown operator")),
-            }?;
-            if precidance < self.current_precidence {
-                break expr;
-            }
-            //this next bit is written so weird
-            let option_next_token = self.iterator.next();
-            if let None = option_next_token {
-                break expr;
-            }
-            let next_token = option_next_token.unwrap();
-            //end weird
-            self.current_precidence = precidance;
-            dbg!(&infix);
-            dbg!(&current_token);
-            let rh_expr = self.parse_expression(next_token);
-            expr = Ok(Self::make_infix(expr?, rh_expr?, infix.to_string()));
         }
     }
 
