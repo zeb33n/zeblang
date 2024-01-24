@@ -64,10 +64,10 @@ fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
             let current_token = iterator
                 .next()
                 .ok_or_else(|| new_error("syntax error: no equals"))?;
-            let mut expr_parser = ExpressionParser::new(iterator);
-            Ok(AssignNode::Expression(
-                expr_parser.parse_expression(current_token, 1)?,
-            ))
+            Ok(AssignNode::Expression(ExpressionParser::parse(
+                iterator,
+                current_token,
+            )?))
         }
         _ => Err(new_error("Invalid Token")),
     }
@@ -76,21 +76,23 @@ fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
 fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
     let err_msg = "syntax error: no exit value";
     let current_token = iterator.next().ok_or_else(|| new_error(err_msg))?;
-    let mut expr_parser = ExpressionParser::new(iterator);
-    Ok(ExitNode::Expression(
-        expr_parser.parse_expression(current_token, 1)?,
-    ))
+    Ok(ExitNode::Expression(ExpressionParser::parse(
+        iterator,
+        current_token,
+    )?))
 }
 
 struct ExpressionParser {
+    // using a struct makes it easy to move the iterator between recursive calls
     iterator: Peekable<IntoIter<TokenKind>>,
 }
 
 impl ExpressionParser {
-    fn new(iterator: IntoIter<TokenKind>) -> Self {
+    fn parse(iterator: IntoIter<TokenKind>, current_token: TokenKind) -> Result<ExpressionNode> {
         Self {
             iterator: iterator.peekable(),
         }
+        .parse_expression(current_token, 1)
     }
 
     fn parse_expression_token(token: TokenKind) -> Result<ExpressionNode> {
