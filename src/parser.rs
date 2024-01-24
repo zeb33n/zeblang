@@ -84,14 +84,12 @@ fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
 
 struct ExpressionParser {
     iterator: Peekable<IntoIter<TokenKind>>,
-    current_precedence: u8,
 }
 
 impl ExpressionParser {
     fn new(iterator: IntoIter<TokenKind>) -> Self {
         Self {
             iterator: iterator.peekable(),
-            current_precedence: 1,
         }
     }
 
@@ -103,44 +101,51 @@ impl ExpressionParser {
         }
     }
 
-    fn parse_expression(&mut self, current_token: TokenKind, i: u8) -> Result<ExpressionNode> {
+    fn parse_expression(
+        &mut self,
+        current_token: TokenKind,
+        current_precedence: u8,
+    ) -> Result<ExpressionNode> {
         let mut expr = match current_token {
             TokenKind::Int(_) => Self::parse_expression_token(current_token),
             TokenKind::VarName(_) => Self::parse_expression_token(current_token),
             _ => Err(new_error("syntax error: invalid expression")),
         };
         loop {
-            let op_token = self.iterator.next_if(|token| {
-                let infix = match token {
-                    TokenKind::Operator(infix) => infix.as_str(),
-                    _ => "bad",
-                };
-                let precedence: u8 = match infix {
-                    "+" | "-" => 1,
-                    "*" | "/" => 2,
-                    _ => 0,
-                };
-                let out = precedence >= self.current_precedence;
-                self.current_precedence = precedence;
-                out
-            });
-
-            let infix = match op_token {
-                Some(token) => match token {
-                    TokenKind::Operator(infix) => Ok(infix),
-                    _ => Err(new_error("syntax error: invalid expression")),
-                }?,
+            let precedance = match self.iterator.peek() {
+                Some(token) => {
+                    let infix = match token {
+                        TokenKind::Operator(infix) => Ok(infix.as_str()),
+                        _ => Err(new_error("syntax error: expected operator")),
+                    }?;
+                    let precedence: u8 = match infix {
+                        "+" | "-" => Ok(1),
+                        "*" | "/" => Ok(2),
+                        _ => Err(new_error(
+                            format!("syntax error: unknown operator {}", infix).as_str(),
+                        )),
+                    }?;
+                    if precedence < current_precedence {
+                        break expr;
+                    }
+                    precedence
+                }
                 None => {
                     break expr;
                 }
             };
+            let op_token = self.iterator.next().unwrap();
+            let infix = match op_token {
+                TokenKind::Operator(infix) => Ok(infix),
+                _ => Err(new_error("syntax error: invalid expression")),
+            }?;
             let next_token = match self.iterator.next() {
                 Some(token) => token,
                 None => {
                     break expr;
                 }
             };
-            let rh_expr = self.parse_expression(next_token, i + 1);
+            let rh_expr = self.parse_expression(next_token, precedance);
             expr = Ok(Self::make_infix(expr?, rh_expr?, infix));
         }
     }
