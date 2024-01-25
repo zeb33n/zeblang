@@ -82,8 +82,8 @@ fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
     )?))
 }
 
+// using a struct makes it easy to move the iterator between recursive calls
 struct ExpressionParser {
-    // using a struct makes it easy to move the iterator between recursive calls
     iterator: Peekable<IntoIter<TokenKind>>,
 }
 
@@ -113,6 +113,7 @@ impl ExpressionParser {
             TokenKind::VarName(_) => Self::parse_expression_token(current_token),
             _ => Err(new_error("syntax error: invalid expression")),
         };
+        // too much indent lets refactor
         loop {
             let precedance = match self.iterator.peek() {
                 Some(token) => {
