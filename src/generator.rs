@@ -36,6 +36,12 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(level), cmd).as_str();
     }
 
+    // this doesnt work for bit sizes above 8
+    // more research needed
+    fn parse_print(&mut self) -> () {
+        todo!();
+    }
+
     fn generate_expr(&mut self, expr: ExpressionNode) -> () {
         match expr {
             ExpressionNode::Value(value) => {
@@ -64,6 +70,13 @@ impl Generator {
                 }
                 self.push("rax", 1);
             }
+            ExpressionNode::Callable(name, expr) => {
+                self.generate_expr(*expr);
+                match name.as_str() {
+                    "print(" => self.parse_print(),
+                    _ => todo!("undeclared function"),
+                }
+            }
         }
     }
 
@@ -88,13 +101,3 @@ impl Generator {
         self.assembly.to_owned()
     }
 }
-//
-//global _start
-//_start:
-//    mov rax, 2
-//    mov rbx, 3
-//    add rax, rbx
-//    push rax
-//    mov rax, 60
-//    pop rdi
-//    syscall

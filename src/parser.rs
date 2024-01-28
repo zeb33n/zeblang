@@ -27,6 +27,7 @@ pub enum ExpressionNode {
     Value(String),
     Var(String),
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
+    Callable(String, Box<ExpressionNode>),
 }
 
 pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
@@ -95,10 +96,22 @@ impl ExpressionParser {
         .parse_expression(current_token, 1)
     }
 
-    fn parse_expression_token(token: TokenKind) -> Result<ExpressionNode> {
+    fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
         match token {
+            TokenKind::OpenParen => {
+                let next_token = self.iterator.next().ok_or(new_error("syntax error"))?;
+                //creates a bug because of precedance.
+                self.parse_expression(next_token, 1)
+            }
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
             TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
+            TokenKind::Callable(name) => {
+                let next_token = self.iterator.next().ok_or(new_error("syntax error"))?;
+                Ok(ExpressionNode::Callable(
+                    name,
+                    Box::new(self.parse_expression(next_token, 1)?),
+                ))
+            }
             _ => Err(new_error("syntax error: balse")),
         }
     }
@@ -108,17 +121,25 @@ impl ExpressionParser {
         current_token: TokenKind,
         current_precedence: u8,
     ) -> Result<ExpressionNode> {
+        // this is useless your just doing the same match twice lol
         let mut expr = match current_token {
-            TokenKind::Int(_) => Self::parse_expression_token(current_token),
-            TokenKind::VarName(_) => Self::parse_expression_token(current_token),
+            TokenKind::Int(_) => self.parse_expression_token(current_token),
+            TokenKind::VarName(_) => self.parse_expression_token(current_token),
+            TokenKind::Callable(_) => self.parse_expression_token(current_token),
+            TokenKind::OpenParen => self.parse_expression_token(current_token),
             _ => Err(new_error("syntax error: invalid expression")),
         };
         // too much indent lets refactor
         loop {
             let precedance = match self.iterator.peek() {
                 Some(token) => {
+                    dbg!(&token);
                     let infix = match token {
                         TokenKind::Operator(infix) => Ok(infix.as_str()),
+                        TokenKind::CloseParen => {
+                            self.iterator.next();
+                            break expr;
+                        }
                         _ => Err(new_error("syntax error: expected operator")),
                     }?;
                     let precedence: u8 = match infix {
@@ -133,9 +154,7 @@ impl ExpressionParser {
                     }
                     precedence
                 }
-                None => {
-                    break expr;
-                }
+                None => break expr,
             };
             let op_token = self.iterator.next().unwrap();
             let infix = match op_token {
@@ -144,9 +163,7 @@ impl ExpressionParser {
             }?;
             let next_token = match self.iterator.next() {
                 Some(token) => token,
-                None => {
-                    break expr;
-                }
+                None => break expr,
             };
             let rh_expr = self.parse_expression(next_token, precedance);
             expr = Ok(Self::make_infix(expr?, rh_expr?, infix));
