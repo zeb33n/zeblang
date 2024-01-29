@@ -51,18 +51,24 @@ impl Generator {
                 self.generic(format!("mov rax, {}", var).as_str(), 1);
                 self.push("rax", 1);
             }
-            ExpressionNode::Infix(expr_1, _op, expr_2) => {
+            ExpressionNode::Infix(expr_1, op, expr_2) => {
                 self.generate_expr(*expr_1);
                 self.generate_expr(*expr_2);
-                self.pop("rax", 1);
                 self.pop("rbx", 1);
-                self.generic("add rax, rbx", 1);
+                self.pop("rax", 1);
+                match op.as_str() {
+                    "+" => self.generic("add rax, rbx", 1),
+                    "-" => self.generic("sub rax, rbx", 1),
+                    "*" => self.generic("imul rbx", 1),
+                    _ => todo!(),
+                }
                 self.push("rax", 1);
             }
         }
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
+        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(exit_node) => {

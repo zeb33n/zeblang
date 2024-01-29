@@ -3,6 +3,7 @@ use std::io::Result;
 use crate::error::new_error;
 use crate::tokenizer::TokenKind;
 
+use std::iter::Peekable;
 use std::vec::IntoIter;
 
 #[derive(Debug)]
@@ -63,9 +64,9 @@ fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
             let current_token = iterator
                 .next()
                 .ok_or_else(|| new_error("syntax error: no equals"))?;
-            Ok(AssignNode::Expression(parse_expression(
-                current_token,
+            Ok(AssignNode::Expression(ExpressionParser::parse(
                 iterator,
+                current_token,
             )?))
         }
         _ => Err(new_error("Invalid Token")),
@@ -75,90 +76,84 @@ fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
 fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
     let err_msg = "syntax error: no exit value";
     let current_token = iterator.next().ok_or_else(|| new_error(err_msg))?;
-    Ok(ExitNode::Expression(parse_expression(
-        current_token,
+    Ok(ExitNode::Expression(ExpressionParser::parse(
         iterator,
+        current_token,
     )?))
 }
 
-fn parse_expression(
-    current_token: TokenKind,
-    iterator: IntoIter<TokenKind>,
-) -> Result<ExpressionNode> {
-    match current_token {
-        TokenKind::Int(_) => do_parse_expression(current_token, iterator),
-        TokenKind::VarName(_) => do_parse_expression(current_token, iterator),
-        _ => Err(new_error("syntax error: invalid expression")),
-    }
+// using a struct makes it easy to move the iterator between recursive calls
+struct ExpressionParser {
+    iterator: Peekable<IntoIter<TokenKind>>,
 }
 
-//this can be better abstract out the different cases and parse them individualy?
-fn do_parse_expression(
-    current_token: TokenKind,
-    mut iterator: IntoIter<TokenKind>,
-) -> Result<ExpressionNode> {
-    let current_node = match current_token {
-        TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
-        TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
-        _ => Err(new_error("syntax error: balse")),
-    }?;
-
-    match iterator.next() {
-        Some(next_token) => {
-            // learn if let
-            let infix = match next_token {
-                TokenKind::Operator(infix) => Ok(infix),
-                _ => Err(new_error("syntax error: balse")),
-            }?;
-            let expression = parse_expression(
-                iterator
-                    .next()
-                    .ok_or(new_error("syntax error: wrong use of infix"))?,
-                iterator,
-            )?;
-            Ok(ExpressionNode::Infix(
-                Box::new(current_node),
-                infix,
-                Box::new(expression),
-            ))
+impl ExpressionParser {
+    fn parse(iterator: IntoIter<TokenKind>, current_token: TokenKind) -> Result<ExpressionNode> {
+        Self {
+            iterator: iterator.peekable(),
         }
-        None => Ok(current_node),
+        .parse_expression(current_token, 1)
+    }
+
+    fn parse_expression_token(token: TokenKind) -> Result<ExpressionNode> {
+        match token {
+            TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
+            TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
+            _ => Err(new_error("syntax error: balse")),
+        }
+    }
+
+    fn parse_expression(
+        &mut self,
+        current_token: TokenKind,
+        current_precedence: u8,
+    ) -> Result<ExpressionNode> {
+        let mut expr = match current_token {
+            TokenKind::Int(_) => Self::parse_expression_token(current_token),
+            TokenKind::VarName(_) => Self::parse_expression_token(current_token),
+            _ => Err(new_error("syntax error: invalid expression")),
+        };
+        // too much indent lets refactor
+        loop {
+            let precedance = match self.iterator.peek() {
+                Some(token) => {
+                    let infix = match token {
+                        TokenKind::Operator(infix) => Ok(infix.as_str()),
+                        _ => Err(new_error("syntax error: expected operator")),
+                    }?;
+                    let precedence: u8 = match infix {
+                        "+" | "-" => Ok(1),
+                        "*" | "/" => Ok(2),
+                        _ => Err(new_error(
+                            format!("syntax error: unknown operator {}", infix).as_str(),
+                        )),
+                    }?;
+                    if precedence < current_precedence {
+                        break expr;
+                    }
+                    precedence
+                }
+                None => {
+                    break expr;
+                }
+            };
+            let op_token = self.iterator.next().unwrap();
+            let infix = match op_token {
+                TokenKind::Operator(infix) => Ok(infix),
+                _ => Err(new_error("syntax error: invalid expression")),
+            }?;
+            let next_token = match self.iterator.next() {
+                Some(token) => token,
+                None => {
+                    break expr;
+                }
+            };
+            let rh_expr = self.parse_expression(next_token, precedance);
+            expr = Ok(Self::make_infix(expr?, rh_expr?, infix));
+        }
+    }
+
+    fn make_infix(lh: ExpressionNode, rh: ExpressionNode, infix: String) -> ExpressionNode {
+        ExpressionNode::Infix(Box::new(lh), infix.to_string(), Box::new(rh))
     }
 }
-
-//
-// this wont work for operator presidance
-//
-// 1 - (2 * 3) + (4 / 5)
-//
-// should transforms into:
-//
-// expr(
-//     expr(
-//         1
-//         -
-//         expr(
-//             2
-//             *
-//             3
-//         )
-//     +
-//     expr(
-//         4
-//         /
-//         5
-// )
-//
-//
-// Infix(expr, op, expr) -> this works as data structure
-//
-// when you multiply or divide you look for another
-// multiply or divide if it doesnt exist you kill that branch
-// and go back to the last plus or minus. I think its like a
-// nested version of what I already have. Rust wont let me
-// miss any edge cases :)
-//
-// where do i get T from
-//fn syntax_error() -> Result<T> {
-//Err(new_error("syntax error: balse"))
-//}
