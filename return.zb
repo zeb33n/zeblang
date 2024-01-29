@@ -1,2 +1,2 @@
-x = 3
-return 20
+y = 7 - 2 * 3 
+exit y 
