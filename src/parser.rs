@@ -121,14 +121,7 @@ impl ExpressionParser {
         current_token: TokenKind,
         current_precedence: u8,
     ) -> Result<ExpressionNode> {
-        // this is useless your just doing the same match twice lol
-        let mut expr = match current_token {
-            TokenKind::Int(_) => self.parse_expression_token(current_token),
-            TokenKind::VarName(_) => self.parse_expression_token(current_token),
-            TokenKind::Callable(_) => self.parse_expression_token(current_token),
-            TokenKind::OpenParen => self.parse_expression_token(current_token),
-            _ => Err(new_error("syntax error: invalid expression")),
-        };
+        let mut expr = self.parse_expression_token(current_token);
         // too much indent lets refactor
         loop {
             let precedance = match self.iterator.peek() {
