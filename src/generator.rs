@@ -6,6 +6,7 @@ use std::collections::HashMap;
 pub struct Generator {
     assembly: String,
     stack_pointer: usize,
+    loops: usize,
     variables: HashMap<String, usize>,
 }
 
@@ -14,6 +15,7 @@ impl Generator {
         Self {
             assembly: String::from("global _start\n_start:\n"),
             stack_pointer: 0,
+            loops: 0,
             variables: HashMap::new(),
         }
     }
@@ -36,10 +38,21 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(level), cmd).as_str();
     }
 
-    // this doesnt work for bit sizes above 8
     // more research needed
     fn parse_print(&mut self) -> () {
         todo!();
+    }
+
+    // add a speacial terminator value like 0x?? or something
+    fn parse_range(&mut self) -> () {
+        self.pop("rax", 1);
+        self.generic("mov rbx, 0", 1);
+        self.generic(format!("loop{}:", &self.loops).as_str(), 1);
+        self.push("rbx", 2);
+        self.generic("inc rbx", 2);
+        self.generic("cmp rax, rbx", 2);
+        self.generic(format!("je loop{}", &self.loops).as_str(), 2);
+        self.loops += 1;
     }
 
     fn generate_expr(&mut self, expr: ExpressionNode) -> () {
@@ -74,6 +87,7 @@ impl Generator {
                 self.generate_expr(*expr);
                 match name.as_str() {
                     "print(" => self.parse_print(),
+                    "range(" => self.parse_range(),
                     _ => todo!("undeclared function"),
                 }
             }
