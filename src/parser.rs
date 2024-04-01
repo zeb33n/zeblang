@@ -10,7 +10,8 @@ use std::vec::IntoIter;
 pub enum StatementNode {
     Exit(ExitNode),
     Assign(String, AssignNode),
-    For(ExpressionNode),
+    For(String, ExpressionNode),
+    EndFor,
 }
 
 #[derive(Debug)]
@@ -37,12 +38,12 @@ pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
 }
 
 fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let current_token = iterator.next().ok_or_else(|| new_error("syntax error"))?;
+    let current_token = iterator.next().ok_or_else(|| new_error("syntax error 1"))?;
     match current_token {
-        crate::TokenKind::Exit | crate::TokenKind::VarName(_) => {
+        TokenKind::Exit | TokenKind::VarName(_) | TokenKind::EndFor | TokenKind::For => {
             parse_statement(current_token, iterator)
         }
-        _ => Err(new_error("syntax error")),
+        _ => Err(new_error("syntax error 2")),
     }
 }
 
@@ -53,12 +54,26 @@ fn parse_statement(
     match current_token {
         TokenKind::Exit => Ok(StatementNode::Exit(parse_exit(iterator)?)),
         TokenKind::VarName(name) => Ok(StatementNode::Assign(name, parse_assign(iterator)?)),
-        TokenKind::For => Ok(StatementNode::For(ExpressionParser::parse(
-            iterator,
-            current_token,
-        )?)),
-        _ => Err(new_error("syntax error:")),
+        TokenKind::For => parse_for(iterator),
+        TokenKind::EndFor => Ok(StatementNode::EndFor),
+        _ => Err(new_error("syntax error 3")),
     }
+}
+
+fn parse_for(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
+    let varname = match iterator.next().ok_or(new_error("syntax error 4"))? {
+        TokenKind::VarName(name) => Ok(name),
+        _ => Err(new_error("syntax error 5")),
+    }?;
+    match iterator.next().ok_or(new_error("syntax error 6"))? {
+        TokenKind::In => Ok(()),
+        _ => Err(new_error("syntax Error 7")),
+    }?;
+    let current_token = iterator.next().ok_or(new_error("syntax error 8"))?;
+    Ok(StatementNode::For(
+        varname,
+        ExpressionParser::parse(iterator, current_token)?,
+    ))
 }
 
 fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
@@ -75,7 +90,7 @@ fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
                 current_token,
             )?))
         }
-        _ => Err(new_error("Invalid Token")),
+        bad_token => Err(new_error("Invalid Token")),
     }
 }
 
@@ -172,3 +187,10 @@ impl ExpressionParser {
         ExpressionNode::Infix(Box::new(lh), infix.to_string(), Box::new(rh))
     }
 }
+
+// we can generate nodes based on this structure
+// start for node
+// statement node
+// statement node
+// ...
+// end for node

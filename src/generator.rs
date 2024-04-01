@@ -112,7 +112,12 @@ impl Generator {
                     let AssignNode::Expression(expr_node) = assign_node;
                     self.generate_expr(expr_node);
                 }
-                StatementNode::For(_) => todo!(),
+                StatementNode::For(var, expr_node) => {
+                    self.variables.insert(var, self.stack_pointer);
+                    self.generate_expr(expr_node);
+                    self.loops += 1;
+                }
+                StatementNode::EndFor => todo!(),
             };
         }
         self.assembly.to_owned()

@@ -2,6 +2,7 @@
 pub enum TokenKind {
     Exit,
     For,
+    EndFor,
     In,
     Assign,
     EndLine,
@@ -20,6 +21,7 @@ fn tokenize_str(token_str: &str) -> TokenKind {
         "(" => TokenKind::OpenParen,
         ")" => TokenKind::CloseParen,
         "for" => TokenKind::For,
+        "rof" => TokenKind::EndFor,
         "in" => TokenKind::In,
         "exit" => TokenKind::Exit,
         "+" | "-" | "/" | "*" => TokenKind::Operator(token_str.to_string()),
