@@ -51,7 +51,9 @@ impl Generator {
         self.push("rbx", 2);
         self.generic("inc rbx", 2);
         self.generic("cmp rax, rbx", 2);
-        self.generic(format!("je loop{}", &self.loops).as_str(), 2);
+        self.generic(format!("je exit{}", &self.loops).as_str(), 2);
+        self.generic(format!("jmp loop{}", &self.loops).as_str(), 2);
+        self.generic(format!("exit{}:", &self.loops).as_str(), 1);
         self.loops += 1;
     }
 
@@ -110,6 +112,7 @@ impl Generator {
                     let AssignNode::Expression(expr_node) = assign_node;
                     self.generate_expr(expr_node);
                 }
+                StatementNode::For(_) => todo!(),
             };
         }
         self.assembly.to_owned()

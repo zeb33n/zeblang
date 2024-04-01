@@ -10,6 +10,7 @@ use std::vec::IntoIter;
 pub enum StatementNode {
     Exit(ExitNode),
     Assign(String, AssignNode),
+    For(ExpressionNode),
 }
 
 #[derive(Debug)]
@@ -52,6 +53,10 @@ fn parse_statement(
     match current_token {
         TokenKind::Exit => Ok(StatementNode::Exit(parse_exit(iterator)?)),
         TokenKind::VarName(name) => Ok(StatementNode::Assign(name, parse_assign(iterator)?)),
+        TokenKind::For => Ok(StatementNode::For(ExpressionParser::parse(
+            iterator,
+            current_token,
+        )?)),
         _ => Err(new_error("syntax error:")),
     }
 }
