@@ -113,11 +113,15 @@ impl Generator {
                     self.generate_expr(expr_node);
                 }
                 StatementNode::For(var, expr_node) => {
+                    self.generic(format!("jmp loop{}", &self.loops).as_str(), 2);
                     self.variables.insert(var, self.stack_pointer);
                     self.generate_expr(expr_node);
-                    self.loops += 1;
+                    todo!()
                 }
-                StatementNode::EndFor => todo!(),
+                StatementNode::EndFor => {
+                    self.generic(format!("jmp loop{}", &self.loops).as_str(), 2);
+                    todo!()
+                }
             };
         }
         self.assembly.to_owned()

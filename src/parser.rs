@@ -90,7 +90,7 @@ fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
                 current_token,
             )?))
         }
-        bad_token => Err(new_error("Invalid Token")),
+        _ => Err(new_error("Invalid Token")),
     }
 }
 
