@@ -156,7 +156,7 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
-        //dbg!(&program);
+        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(exit_node) => self.generate_exit(exit_node),
