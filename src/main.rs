@@ -2,7 +2,7 @@ use std::env;
 use std::io::Result;
 
 mod tokenizer;
-use tokenizer::{tokenize, TokenKind};
+use tokenizer::tokenize;
 
 mod local_client;
 use local_client::{read_file, write_assembly_file};
