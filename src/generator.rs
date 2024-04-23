@@ -69,12 +69,6 @@ impl Generator {
             }
             ExpressionNode::Var(value) => {
                 let variable_position = self.variables.get(&value).unwrap();
-                let position = dbg!(self.stack_pointer - variable_position);
-                //let position = if variable_position == &self.stack_pointer {
-                //    dbg!(*variable_position)
-                //} else {
-                //    dbg!(self.stack_pointer - variable_position)
-                //};
                 let var = format!(
                     "[rsp + {}]",
                     (self.stack_pointer - variable_position - 1) * 8
@@ -158,9 +152,6 @@ impl Generator {
                     self.generic(format!("jmp loop{}", &self.loops).as_str());
                     self.level -= 1;
 
-                    //enter the loop
-                    //variables arent in the smae place on the stack after every loop !?
-                    //check if var already exists. If yes update middle of stack
                     self.generic(format!("loop{}:", &self.loops).as_str());
                     self.level += 1;
                 }
@@ -176,10 +167,3 @@ impl Generator {
         self.assembly.to_owned()
     }
 }
-
-// we can generate nodes based on this structure
-// start for node
-// statement node
-// statement node
-// ...
-// end for node

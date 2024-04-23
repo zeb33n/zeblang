@@ -1,7 +1,8 @@
 i = 9
 x = 0
+z = 3
 while i
   x = x + 2
   i = i - 1
 elihw
-exit x
+exit x + z + 2

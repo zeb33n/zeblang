@@ -41,7 +41,6 @@ pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
 
 fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
     let current_token = iterator.next().ok_or_else(|| new_error("syntax error 1"))?;
-    dbg!(&current_token);
     match current_token {
         TokenKind::Exit | TokenKind::VarName(_) | TokenKind::EndWhile | TokenKind::While => {
             parse_statement(current_token, iterator)
@@ -158,7 +157,6 @@ impl ExpressionParser {
         loop {
             let precedance = match self.iterator.peek() {
                 Some(token) => {
-                    dbg!(&token);
                     let infix = match token {
                         TokenKind::Operator(infix) => Ok(infix.as_str()),
                         TokenKind::CloseParen => {
