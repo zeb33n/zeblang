@@ -69,12 +69,16 @@ impl Generator {
             }
             ExpressionNode::Var(value) => {
                 let variable_position = self.variables.get(&value).unwrap();
-                let position = if variable_position == &self.stack_pointer {
-                    *variable_position
-                } else {
-                    self.stack_pointer - variable_position
-                };
-                let var = format!("[rsp + {}]", (position - 1) * 8);
+                let position = dbg!(self.stack_pointer - variable_position);
+                //let position = if variable_position == &self.stack_pointer {
+                //    dbg!(*variable_position)
+                //} else {
+                //    dbg!(self.stack_pointer - variable_position)
+                //};
+                let var = format!(
+                    "[rsp + {}]",
+                    (self.stack_pointer - variable_position - 1) * 8
+                );
                 self.generic(format!("mov rax, {}", var).as_str());
                 self.push("rax");
             }
@@ -114,9 +118,23 @@ impl Generator {
                     self.generic("syscall");
                 }
                 StatementNode::Assign(name, assign_node) => {
-                    self.variables.insert(name, self.stack_pointer);
-                    let AssignNode::Expression(expr_node) = assign_node;
-                    self.generate_expr(expr_node);
+                    if self.variables.contains_key(&name) {
+                        let AssignNode::Expression(expr_node) = assign_node;
+                        self.generate_expr(expr_node);
+                        self.pop("rax");
+                        let variable_position = self.variables.get(&name).unwrap();
+                        self.generic(
+                            format!(
+                                "mov [rsp + {}], rax",
+                                (self.stack_pointer - variable_position - 1) * 8
+                            )
+                            .as_str(),
+                        )
+                    } else {
+                        self.variables.insert(name, self.stack_pointer);
+                        let AssignNode::Expression(expr_node) = assign_node;
+                        self.generate_expr(expr_node);
+                    };
                 }
                 StatementNode::For(var, expr_node) => {
                     self.generic(format!("jmp loop{}", &self.loops).as_str());
@@ -142,6 +160,7 @@ impl Generator {
 
                     //enter the loop
                     //variables arent in the smae place on the stack after every loop !?
+                    //check if var already exists. If yes update middle of stack
                     self.generic(format!("loop{}:", &self.loops).as_str());
                     self.level += 1;
                 }

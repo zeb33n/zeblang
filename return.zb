@@ -1,7 +1,7 @@
-i = 10
+i = 9
 x = 0
 while i
+  x = x + 2
   i = i - 1
-  x = x + 1
 elihw
-exit x 
+exit x
