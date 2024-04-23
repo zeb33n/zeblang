@@ -1,8 +1,9 @@
 i = 9
 x = 0
 z = 3
+y = z - 2
 while i
   x = x + 2
   i = i - 1
 elihw
-exit x + z + 2
+exit x + z + 2 + y
