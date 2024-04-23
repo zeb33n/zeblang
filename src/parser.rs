@@ -12,6 +12,8 @@ pub enum StatementNode {
     Assign(String, AssignNode),
     For(String, ExpressionNode),
     EndFor,
+    While(ExpressionNode),
+    EndWhile,
 }
 
 #[derive(Debug)]
@@ -39,8 +41,9 @@ pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
 
 fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
     let current_token = iterator.next().ok_or_else(|| new_error("syntax error 1"))?;
+
     match current_token {
-        TokenKind::Exit | TokenKind::VarName(_) | TokenKind::EndFor | TokenKind::For => {
+        TokenKind::Exit | TokenKind::VarName(_) | TokenKind::EndWhile | TokenKind::While => {
             parse_statement(current_token, iterator)
         }
         _ => Err(new_error("syntax error 2")),
@@ -56,6 +59,8 @@ fn parse_statement(
         TokenKind::VarName(name) => Ok(StatementNode::Assign(name, parse_assign(iterator)?)),
         TokenKind::For => parse_for(iterator),
         TokenKind::EndFor => Ok(StatementNode::EndFor),
+        TokenKind::While => parse_while(iterator),
+        TokenKind::EndWhile => Ok(StatementNode::EndWhile),
         _ => Err(new_error("syntax error 3")),
     }
 }
@@ -74,6 +79,13 @@ fn parse_for(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
         varname,
         ExpressionParser::parse(iterator, current_token)?,
     ))
+}
+
+fn parse_while(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
+    let exp_start = iterator.next().ok_or(new_error("invalid while"))?;
+    Ok(StatementNode::While(ExpressionParser::parse(
+        iterator, exp_start,
+    )?))
 }
 
 fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
@@ -187,10 +199,3 @@ impl ExpressionParser {
         ExpressionNode::Infix(Box::new(lh), infix.to_string(), Box::new(rh))
     }
 }
-
-// we can generate nodes based on this structure
-// start for node
-// statement node
-// statement node
-// ...
-// end for node

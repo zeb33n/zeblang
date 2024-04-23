@@ -1,5 +1,7 @@
-x = range( 3 )
-for i in range( 3 )
-x = x + 1
-rof
-exit x
+i = 10
+x = 0
+while i
+  i = i - 1
+  x = x + 1
+elihw
+exit x 
