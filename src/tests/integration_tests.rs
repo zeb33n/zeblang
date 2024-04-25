@@ -10,35 +10,29 @@ fn extract_value_from_stdout(stdout: &Vec<u8>) -> u8 {
         .unwrap()
 }
 
-#[test]
-fn test_while() {
+fn run_zeblang_file(addr: &str) -> u8 {
     let output = Command::new("bash")
         .arg("test_compile.sh")
-        .arg("test_scripts/while.zb")
+        .arg(addr)
         .output()
         .expect("failed");
-    let out = extract_value_from_stdout(&output.stdout);
+    extract_value_from_stdout(&output.stdout)
+}
+
+#[test]
+fn test_while() {
+    let out = run_zeblang_file("test_scripts/while.zb");
     assert_eq!(12, out);
 }
 
 #[test]
 fn test_precedance() {
-    let output = Command::new("bash")
-        .arg("test_compile.sh")
-        .arg("test_scripts/precedance.zb")
-        .output()
-        .expect("failed");
-    let out = extract_value_from_stdout(&output.stdout);
+    let out = run_zeblang_file("test_scripts/precedance.zb");
     assert_eq!(13, out);
 }
 
 #[test]
 fn test_variables() {
-    let output = Command::new("bash")
-        .arg("test_compile.sh")
-        .arg("test_scripts/variables.zb")
-        .output()
-        .expect("failed");
-    let out = extract_value_from_stdout(&output.stdout);
+    let out = run_zeblang_file("test_scripts/variables.zb");
     assert_eq!(3, out);
 }
