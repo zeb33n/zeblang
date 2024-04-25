@@ -31,3 +31,6 @@ fn main() -> Result<()> {
     write_assembly_file(&filename, assembly)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

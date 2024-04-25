@@ -147,6 +147,33 @@ impl ExpressionParser {
         }
     }
 
+    fn get_infix_op(&mut self) -> Result<Option<String>> {
+        match self.iterator.peek() {
+            Some(token) => {
+                let infix = match token {
+                    TokenKind::Operator(infix) => Ok(Some(infix)),
+                    TokenKind::CloseParen => {
+                        self.iterator.next();
+                        Ok(None)
+                    }
+                    _ => Err(new_error("syntax error: expected operator")),
+                }?;
+                Ok(infix.cloned()) //do a better job here
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn get_precedance(&mut self, infix: String) -> Result<u8> {
+        match infix.as_str() {
+            "+" | "-" => Ok(1),
+            "*" | "/" => Ok(2),
+            _ => Err(new_error(
+                format!("syntax error: unknown operator {}", infix).as_str(),
+            )),
+        }
+    }
+
     fn parse_expression(
         &mut self,
         current_token: TokenKind,
@@ -155,30 +182,14 @@ impl ExpressionParser {
         let mut expr = self.parse_expression_token(current_token);
         // too much indent lets refactor
         loop {
-            let precedance = match self.iterator.peek() {
-                Some(token) => {
-                    let infix = match token {
-                        TokenKind::Operator(infix) => Ok(infix.as_str()),
-                        TokenKind::CloseParen => {
-                            self.iterator.next();
-                            break expr;
-                        }
-                        _ => Err(new_error("syntax error: expected operator")),
-                    }?;
-                    let precedence: u8 = match infix {
-                        "+" | "-" => Ok(1),
-                        "*" | "/" => Ok(2),
-                        _ => Err(new_error(
-                            format!("syntax error: unknown operator {}", infix).as_str(),
-                        )),
-                    }?;
-                    if precedence < current_precedence {
-                        break expr;
-                    }
-                    precedence
-                }
+            let infix = match self.get_infix_op()? {
+                Some(infix) => infix,
                 None => break expr,
             };
+            let precedance = self.get_precedance(infix)?;
+            if precedance < current_precedence {
+                break expr;
+            }
             let op_token = self.iterator.next().unwrap();
             let infix = match op_token {
                 TokenKind::Operator(infix) => Ok(infix),
