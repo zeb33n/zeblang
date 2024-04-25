@@ -1,0 +1,7 @@
+x = 1
+z = x
+x = 2
+k = z
+y = x 
+out = k + y
+exit out
