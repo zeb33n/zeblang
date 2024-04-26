@@ -4,7 +4,7 @@ use std::vec::IntoIter;
 
 use crate::error::new_error;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
     Exit,
     For,
