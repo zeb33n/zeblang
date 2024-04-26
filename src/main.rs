@@ -2,7 +2,7 @@ use std::env;
 use std::io::Result;
 
 mod tokenizer;
-use tokenizer::tokenize;
+use tokenizer::Lexer;
 
 mod local_client;
 use local_client::{read_file, write_assembly_file};
@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     let code = read_file(filename);
     let parse_tree: Vec<StatementNode> = code
         .into_iter()
-        .map(|line| parse(tokenize(line)).unwrap())
+        .map(|line| parse(Lexer::lex(line).unwrap()).unwrap())
         .collect();
     let mut generator = Generator::new();
     let assembly = generator.generate(parse_tree);
