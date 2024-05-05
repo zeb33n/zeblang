@@ -89,6 +89,8 @@ impl Generator {
                     "+" => self.generic("add rax, rbx"),
                     "-" => self.generic("sub rax, rbx"),
                     "*" => self.generic("imul rbx"),
+                    "==" => self.generic("sub rax, rbx"), // what if 3 == 5 should be 1 not 128 -2
+                    "!=" => todo!(),                      // we can just flip == result
                     _ => todo!(),
                 }
                 self.push("rax");
@@ -165,6 +167,8 @@ impl Generator {
                 StatementNode::EndFor => self.generate_end_for(),
                 StatementNode::While(expr_node) => self.generate_while(expr_node),
                 StatementNode::EndWhile => self.generate_end_while(),
+                StatementNode::If(expr_node) => todo!(),
+                StatementNode::EndIf => todo!(),
             };
         }
         self.assembly.to_owned()

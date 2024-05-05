@@ -6,6 +6,8 @@ use crate::error::new_error;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
+    If,
+    EndIf,
     Exit,
     For,
     EndFor,
@@ -21,9 +23,6 @@ pub enum TokenKind {
     Operator(String),
     Callable(String),
 }
-
-// get words
-// get tokens
 
 pub struct Lexer {
     chars: Peekable<IntoIter<u8>>,
@@ -46,11 +45,10 @@ impl Lexer {
             };
             let token = match byte {
                 b' ' => continue,
-                b'=' => Ok(TokenKind::Assign),
                 b';' => Ok(TokenKind::EndLine),
                 b'(' => Ok(TokenKind::OpenParen),
                 b')' => Ok(TokenKind::CloseParen),
-                b'+' | b'-' | b'/' | b'*' => Ok(TokenKind::Operator(String::from(byte as char))),
+                b'=' | b'!' | b'+' | b'-' | b'/' | b'*' => Ok(self.lex_op(byte)),
                 b'0'..=b'9' => Ok(self.lex_int(byte)),
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => Ok(self.lex_word(byte)),
                 bad_token => Err(new_error(
@@ -60,6 +58,40 @@ impl Lexer {
             tokens.push(token)
         }
         Ok(tokens)
+    }
+
+    fn lex_op(&mut self, byte: u8) -> TokenKind {
+        match byte {
+            b'=' => self.lex_equals(byte),
+            b'!' => self.lex_bang(byte),
+            _ => TokenKind::Operator(String::from(byte as char)),
+        }
+    }
+
+    fn lex_equals(&mut self, byte: u8) -> TokenKind {
+        let mut op = String::from(byte as char);
+        let next = match self.chars.peek() {
+            Some(byte) => byte,
+            None => return TokenKind::Assign,
+        };
+        match next {
+            b'=' => op.push(self.chars.next().unwrap() as char),
+            _ => return TokenKind::Assign,
+        }
+        TokenKind::Operator(op)
+    }
+
+    fn lex_bang(&mut self, byte: u8) -> TokenKind {
+        let mut op = String::from(byte as char);
+        let next = match self.chars.peek() {
+            Some(byte) => byte,
+            None => return TokenKind::Operator(op),
+        };
+        match next {
+            b'=' => op.push(self.chars.next().unwrap() as char),
+            _ => return TokenKind::Operator(op),
+        }
+        TokenKind::Operator(op)
     }
 
     fn lex_int(&mut self, byte: u8) -> TokenKind {
@@ -99,6 +131,8 @@ impl Lexer {
 
     fn lex_keyword(word: &str) -> TokenKind {
         match word {
+            "if" => TokenKind::If,
+            "fi" => TokenKind::EndIf,
             "for" => TokenKind::For,
             "rof" => TokenKind::EndFor,
             "while" => TokenKind::While,

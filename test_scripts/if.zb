@@ -1,0 +1,14 @@
+ex = 1
+why = 2
+y = 21
+
+if ex == why
+  x = 4
+fi
+
+if y != x 
+  x = 3
+fi 
+
+exit x 
+

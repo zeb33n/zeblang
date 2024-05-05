@@ -12,6 +12,8 @@ pub enum StatementNode {
     Assign(String, AssignNode),
     For(String, ExpressionNode),
     EndFor,
+    If(ExpressionNode),
+    EndIf,
     While(ExpressionNode),
     EndWhile,
 }
@@ -42,9 +44,12 @@ pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
 fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
     let current_token = iterator.next().ok_or_else(|| new_error("syntax error 1"))?;
     match current_token {
-        TokenKind::Exit | TokenKind::VarName(_) | TokenKind::EndWhile | TokenKind::While => {
-            parse_statement(current_token, iterator)
-        }
+        TokenKind::Exit
+        | TokenKind::VarName(_)
+        | TokenKind::EndWhile
+        | TokenKind::While
+        | TokenKind::If
+        | TokenKind::EndIf => parse_statement(current_token, iterator),
         _ => Err(new_error("syntax error 2")),
     }
 }
@@ -60,6 +65,8 @@ fn parse_statement(
         TokenKind::EndFor => Ok(StatementNode::EndFor),
         TokenKind::While => parse_while(iterator),
         TokenKind::EndWhile => Ok(StatementNode::EndWhile),
+        TokenKind::If => parse_if(iterator),
+        TokenKind::EndIf => Ok(StatementNode::EndIf),
         _ => Err(new_error("syntax error 3")),
     }
 }
@@ -78,6 +85,13 @@ fn parse_for(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
         varname,
         ExpressionParser::parse(iterator, current_token)?,
     ))
+}
+
+fn parse_if(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
+    let exp_start = iterator.next().ok_or(new_error("invalid if"))?;
+    Ok(StatementNode::If(ExpressionParser::parse(
+        iterator, exp_start,
+    )?))
 }
 
 fn parse_while(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
@@ -166,6 +180,7 @@ impl ExpressionParser {
 
     fn get_precedance(&mut self, infix: String) -> Result<u8> {
         match infix.as_str() {
+            "==" | "!=" => Ok(0),
             "+" | "-" => Ok(1),
             "*" | "/" => Ok(2),
             _ => Err(new_error(
