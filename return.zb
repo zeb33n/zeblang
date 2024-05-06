@@ -1,4 +1,4 @@
-maybe_prime = 11
+maybe_prime = 127
 i = 3
 out = 1
 while i != maybe_prime
