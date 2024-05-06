@@ -16,7 +16,7 @@ x = 2
 exit x
 ```
 exits with exit code 2
-### Adding
+### Maths
 Add stuff together!
 ```
 x = 1 + 1
@@ -38,4 +38,51 @@ y = 2
 exit x + y
 ```
 exits with 3
+
+subtraction `-`, multiplication `*`, division `/` and modulo `%` are also supported. 
+
+operator precedance exists!
+```
+exit (1 + 2) * 3 + 1 * 1
+```
+exits with 10
+### If Statements
+You can write if statements with the following syntax! 1 is true 0 is false. 
+```
+x = 1
+if 1
+    x = 2
+fi
+```
+`x` will be equal to 2!
+### While Loops
+You can also write while loops! 
+```
+x = 0
+i = 10
+while i
+    x = x + 2
+    i = i - 1
+elihw
+exit x
+```
+exits with 20!
+
+check out this program that tells you whether the input is prime
+```
+maybe_prime = 127
+i = 3
+out = 1
+while i != maybe_prime
+  if maybe_prime % i == 0
+    out = 0
+  fi
+  i = i + 1
+elihw
+exit out
+```
+
+
+
+
 
