@@ -7,6 +7,7 @@ pub struct Generator {
     assembly: String,
     stack_pointer: usize,
     loops: usize,
+    ifs: usize,
     equalitys: usize,
     level: usize,
     variables: HashMap<String, usize>,
@@ -18,6 +19,7 @@ impl Generator {
             assembly: String::from("global _start\n_start:\n"),
             stack_pointer: 0,
             loops: 0,
+            ifs: 0,
             equalitys: 0,
             level: 1,
             variables: HashMap::new(),
@@ -91,8 +93,8 @@ impl Generator {
                     "+" => self.generic("add rax, rbx"),
                     "-" => self.generic("sub rax, rbx"),
                     "*" => self.generic("imul rbx"),
-                    "==" => self.generate_equality(), // what if 3 == 5 should be 1 not 128 -2
-                    "!=" => self.generate_inequality(), // we can just flip == result
+                    "==" => self.generate_equality(),
+                    "!=" => self.generate_inequality(),
                     _ => todo!(),
                 }
                 self.push("rax");
@@ -170,7 +172,20 @@ impl Generator {
         self.loops += 1;
     }
 
+    fn generate_if(&mut self, node: ExpressionNode) -> () {
+        self.generate_expr(node);
+        self.pop("rax");
+        self.generic("cmp rax, 0");
+        self.generic(format!("je endif{}", self.ifs).as_str());
+    }
+
+    fn generate_end_if(&mut self) -> () {
+        self.generic(format!("endif{}:", self.ifs).as_str());
+        self.ifs += 1;
+    }
+
     fn generate_for(&mut self, var: String, node: ExpressionNode) -> () {
+        (var, node); //silence warnings
         todo!()
     }
 
@@ -188,8 +203,8 @@ impl Generator {
                 StatementNode::EndFor => self.generate_end_for(),
                 StatementNode::While(expr_node) => self.generate_while(expr_node),
                 StatementNode::EndWhile => self.generate_end_while(),
-                StatementNode::If(expr_node) => todo!(),
-                StatementNode::EndIf => todo!(),
+                StatementNode::If(expr_node) => self.generate_if(expr_node),
+                StatementNode::EndIf => self.generate_end_if(),
             };
         }
         self.assembly.to_owned()
