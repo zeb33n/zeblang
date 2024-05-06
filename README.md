@@ -1,5 +1,5 @@
 # ZebLang!
-Welcome to a very basic programming language WIP 
+Welcome to a very basic programming language WIP. Some of these features are only found on the development branch!
 
 ## Features!
 ### Assigning Variables
@@ -46,7 +46,7 @@ operator precedance exists!
 exit (1 + 2) * 3 + 1 * 1
 ```
 exits with 10
-### If Statements
+### If Statements!
 You can write if statements with the following syntax! 1 is true 0 is false. 
 ```
 x = 1
@@ -55,7 +55,7 @@ if 1
 fi
 ```
 `x` will be equal to 2!
-### While Loops
+### While Loops!
 You can also write while loops! 
 ```
 x = 0
@@ -68,6 +68,7 @@ exit x
 ```
 exits with 20!
 
+## Examples!
 check out this program that tells you whether the input is prime
 ```
 maybe_prime = 127
