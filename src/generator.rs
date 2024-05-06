@@ -61,18 +61,22 @@ impl Generator {
         self.loops += 1;
     }
 
+    fn get_var_pointer(&mut self, name: &str) -> String {
+        let variable_position = self.variables.get(name).unwrap();
+        format!(
+            "[rsp + {}]",
+            (self.stack_pointer - variable_position - 1) * 8
+        )
+    }
+
     fn generate_expr(&mut self, expr: ExpressionNode) -> () {
         match expr {
             ExpressionNode::Value(value) => {
                 self.generic(format!("mov rax, {}", value).as_str());
                 self.push("rax");
             }
-            ExpressionNode::Var(value) => {
-                let variable_position = self.variables.get(&value).unwrap();
-                let var = format!(
-                    "[rsp + {}]",
-                    (self.stack_pointer - variable_position - 1) * 8
-                );
+            ExpressionNode::Var(name) => {
+                let var = self.get_var_pointer(&name);
                 self.generic(format!("mov rax, {}", var).as_str());
                 self.push("rax");
             }
@@ -100,68 +104,67 @@ impl Generator {
         }
     }
 
+    fn generate_exit(&mut self, node: ExitNode) -> () {
+        let ExitNode::Expression(expr_node) = node;
+        self.generate_expr(expr_node);
+        self.generic("mov rax, 60");
+        self.pop("rdi");
+        self.generic("syscall");
+    }
+
+    fn generate_assign(&mut self, name: String, node: AssignNode) -> () {
+        let AssignNode::Expression(expr_node) = node;
+
+        if !self.variables.contains_key(&name) {
+            self.variables.insert(name, self.stack_pointer);
+            self.generate_expr(expr_node);
+        } else {
+            self.generate_expr(expr_node);
+            self.pop("rax");
+            let var = self.get_var_pointer(&name);
+            self.generic(format!("mov {}, rax", var).as_str())
+        };
+    }
+
+    fn generate_while(&mut self, node: ExpressionNode) -> () {
+        self.generic(format!("wexp{}:", &self.loops).as_str());
+        self.level += 1;
+        self.generate_expr(node);
+        self.pop("rax");
+        self.generic("mov rbx, 0");
+        self.generic("cmp rax, rbx");
+        self.generic(format!("je exit{}", &self.loops).as_str());
+        self.generic(format!("jmp loop{}", &self.loops).as_str());
+        self.level -= 1;
+        self.generic(format!("loop{}:", &self.loops).as_str());
+        self.level += 1;
+    }
+
+    fn generate_end_while(&mut self) -> () {
+        self.generic(format!("jmp wexp{}", &self.loops).as_str());
+        self.level -= 1;
+        self.generic(format!("exit{}:", &self.loops).as_str());
+        self.loops += 1;
+    }
+
+    fn generate_for(&mut self, var: String, node: ExpressionNode) -> () {
+        todo!()
+    }
+
+    fn generate_end_for(&mut self) -> () {
+        todo!()
+    }
+
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
         dbg!(&program);
         for line in program.into_iter() {
             match line {
-                StatementNode::Exit(exit_node) => {
-                    let ExitNode::Expression(expr_node) = exit_node;
-                    self.generate_expr(expr_node);
-                    self.generic("mov rax, 60");
-                    self.pop("rdi");
-                    self.generic("syscall");
-                }
-                StatementNode::Assign(name, assign_node) => {
-                    if self.variables.contains_key(&name) {
-                        let AssignNode::Expression(expr_node) = assign_node;
-                        self.generate_expr(expr_node);
-                        self.pop("rax");
-                        let variable_position = self.variables.get(&name).unwrap();
-                        self.generic(
-                            format!(
-                                "mov [rsp + {}], rax",
-                                (self.stack_pointer - variable_position - 1) * 8
-                            )
-                            .as_str(),
-                        )
-                    } else {
-                        self.variables.insert(name, self.stack_pointer);
-                        let AssignNode::Expression(expr_node) = assign_node;
-                        self.generate_expr(expr_node);
-                    };
-                }
-                StatementNode::For(var, expr_node) => {
-                    self.generic(format!("jmp loop{}", &self.loops).as_str());
-                    self.variables.insert(var, self.stack_pointer);
-                    self.generate_expr(expr_node);
-                    todo!()
-                }
-                StatementNode::EndFor => {
-                    self.generic(format!("jmp loop{}", &self.loops).as_str());
-                    todo!()
-                }
-                StatementNode::While(expr_node) => {
-                    // the conditional part of the while
-                    self.generic(format!("wexp{}:", &self.loops).as_str());
-                    self.level += 1;
-                    self.generate_expr(expr_node);
-                    self.pop("rax");
-                    self.generic("mov rbx, 0");
-                    self.generic("cmp rax, rbx");
-                    self.generic(format!("je exit{}", &self.loops).as_str());
-                    self.generic(format!("jmp loop{}", &self.loops).as_str());
-                    self.level -= 1;
-
-                    self.generic(format!("loop{}:", &self.loops).as_str());
-                    self.level += 1;
-                }
-                //wont work with nested loops?!
-                StatementNode::EndWhile => {
-                    self.generic(format!("jmp wexp{}", &self.loops).as_str());
-                    self.level -= 1;
-                    self.generic(format!("exit{}:", &self.loops).as_str());
-                    self.loops += 1;
-                }
+                StatementNode::Exit(exit_node) => self.generate_exit(exit_node),
+                StatementNode::Assign(name, assign_node) => self.generate_assign(name, assign_node),
+                StatementNode::For(var, expr_node) => self.generate_for(var, expr_node),
+                StatementNode::EndFor => self.generate_end_for(),
+                StatementNode::While(expr_node) => self.generate_while(expr_node),
+                StatementNode::EndWhile => self.generate_end_while(),
             };
         }
         self.assembly.to_owned()
