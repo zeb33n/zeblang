@@ -180,9 +180,9 @@ impl ExpressionParser {
 
     fn get_precedance(&mut self, infix: String) -> Result<u8> {
         match infix.as_str() {
-            "==" | "!=" => Ok(0),
-            "+" | "-" => Ok(1),
-            "*" | "/" => Ok(2),
+            "==" | "!=" => Ok(1),
+            "+" | "-" => Ok(2),
+            "*" | "/" => Ok(3),
             _ => Err(new_error(
                 format!("syntax error: unknown operator {}", infix).as_str(),
             )),

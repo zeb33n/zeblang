@@ -7,6 +7,7 @@ pub struct Generator {
     assembly: String,
     stack_pointer: usize,
     loops: usize,
+    equalitys: usize,
     level: usize,
     variables: HashMap<String, usize>,
 }
@@ -17,6 +18,7 @@ impl Generator {
             assembly: String::from("global _start\n_start:\n"),
             stack_pointer: 0,
             loops: 0,
+            equalitys: 0,
             level: 1,
             variables: HashMap::new(),
         }
@@ -85,12 +87,13 @@ impl Generator {
                 self.generate_expr(*expr_2);
                 self.pop("rbx");
                 self.pop("rax");
+                dbg!(&op);
                 match op.as_str() {
                     "+" => self.generic("add rax, rbx"),
                     "-" => self.generic("sub rax, rbx"),
                     "*" => self.generic("imul rbx"),
-                    "==" => self.generic("sub rax, rbx"), // what if 3 == 5 should be 1 not 128 -2
-                    "!=" => todo!(),                      // we can just flip == result
+                    "==" => self.generate_equality(), // what if 3 == 5 should be 1 not 128 -2
+                    "!=" => self.generate_inequality(), // we can just flip == result
                     _ => todo!(),
                 }
                 self.push("rax");
@@ -106,8 +109,26 @@ impl Generator {
         }
     }
 
+    // the operator is not working y==x returns y
+    fn generate_equality(&mut self) -> () {
+        self.generic("cmp rax, rbx");
+        self.generic(format!("je EQUALITY{}", self.equalitys).as_str());
+        self.generic("mov rax, 0");
+        self.generic(format!("EQUALITY{}:", self.equalitys).as_str());
+        self.level += 1;
+        self.generic("mov rax, 1");
+        self.level -= 1;
+        self.equalitys += 1;
+    }
+
+    fn generate_inequality(&mut self) -> () {
+        self.generate_equality();
+        self.generic("not rax");
+    }
+
     fn generate_exit(&mut self, node: ExitNode) -> () {
         let ExitNode::Expression(expr_node) = node;
+        dbg!(&expr_node);
         self.generate_expr(expr_node);
         self.generic("mov rax, 60");
         self.pop("rdi");
