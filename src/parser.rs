@@ -182,7 +182,7 @@ impl ExpressionParser {
         match infix.as_str() {
             "==" | "!=" => Ok(1),
             "+" | "-" => Ok(2),
-            "*" | "/" => Ok(3),
+            "*" | "/" | "%" => Ok(3),
             _ => Err(new_error(
                 format!("syntax error: unknown operator {}", infix).as_str(),
             )),

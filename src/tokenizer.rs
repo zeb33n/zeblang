@@ -48,7 +48,7 @@ impl Lexer {
                 b';' => Ok(TokenKind::EndLine),
                 b'(' => Ok(TokenKind::OpenParen),
                 b')' => Ok(TokenKind::CloseParen),
-                b'=' | b'!' | b'+' | b'-' | b'/' | b'*' => Ok(self.lex_op(byte)),
+                b'=' | b'!' | b'+' | b'-' | b'/' | b'*' | b'%' => Ok(self.lex_op(byte)),
                 b'0'..=b'9' => Ok(self.lex_int(byte)),
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => Ok(self.lex_word(byte)),
                 bad_token => Err(new_error(

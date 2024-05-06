@@ -1,14 +1,1 @@
-z=10
-y=11
-x=3
-if y == z
-  x = 1
-fi
-if y != x 
-  x = 3
-  y = y - 2
-fi 
-if 1
-  exit x 
-fi
-exit y
+exit 4 % 2

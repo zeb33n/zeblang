@@ -93,6 +93,8 @@ impl Generator {
                     "+" => self.generic("add rax, rbx"),
                     "-" => self.generic("sub rax, rbx"),
                     "*" => self.generic("imul rbx"),
+                    "/" => self.generic("idiv rcx"),
+                    "%" => self.generate_modulo(),
                     "==" => self.generate_equality(),
                     "!=" => self.generate_inequality(),
                     _ => todo!(),
@@ -110,7 +112,12 @@ impl Generator {
         }
     }
 
-    // the operator is not working y==x returns y
+    fn generate_modulo(&mut self) -> () {
+        self.generic("xor rdx, rdx"); // clear register xor is faster
+        self.generic("idiv rbx");
+        self.generic("mov rax, rdx");
+    }
+
     fn generate_equality(&mut self) -> () {
         self.generic("cmp rax, rbx");
         self.generic(format!("je EQUALITY{}", self.equalitys).as_str());
