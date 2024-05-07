@@ -1,0 +1,4 @@
+array_1 = [1, 2, 3]
+array_2 = [3->7]
+array_3 = [1+1, 2+2, 4/2]
+exit array_1[0] + array_2[3] + array_3[1]

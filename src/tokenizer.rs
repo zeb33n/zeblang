@@ -16,8 +16,12 @@ pub enum TokenKind {
     In,
     Assign,
     EndLine,
+    Comma,
+    OpenSquare,
+    CloseSquare,
     OpenParen,
     CloseParen,
+    Range,
     VarName(String),
     Int(String),
     Operator(String),
@@ -45,6 +49,9 @@ impl Lexer {
             };
             let token = match byte {
                 b' ' => continue,
+                b',' => Ok(TokenKind::Comma),
+                b'[' => Ok(TokenKind::OpenSquare),
+                b']' => Ok(TokenKind::CloseSquare),
                 b';' => Ok(TokenKind::EndLine),
                 b'(' => Ok(TokenKind::OpenParen),
                 b')' => Ok(TokenKind::CloseParen),
@@ -63,8 +70,24 @@ impl Lexer {
     fn lex_op(&mut self, byte: u8) -> TokenKind {
         match byte {
             b'=' => self.lex_equals(byte),
+            b'-' => self.lex_dash(byte),
             b'!' => self.lex_bang(byte),
             _ => TokenKind::Operator(String::from(byte as char)),
+        }
+    }
+
+    fn lex_dash(&mut self, byte: u8) -> TokenKind {
+        let op = String::from(byte as char);
+        let next = match self.chars.peek() {
+            Some(byte) => byte,
+            None => return TokenKind::Operator(op),
+        };
+        match next {
+            b'>' => {
+                self.chars.next();
+                return TokenKind::Range;
+            }
+            _ => return TokenKind::Operator(op),
         }
     }
 

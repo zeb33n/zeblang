@@ -1,10 +1,1 @@
-maybe_prime = 127
-i = 3
-out = 1
-while i != maybe_prime
-  if maybe_prime % i == 0
-    out = 0
-  fi
-  i = i + 1
-elihw
-exit out
+x = [1, 2, 1 + 1]

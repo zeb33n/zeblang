@@ -34,6 +34,7 @@ pub enum ExpressionNode {
     Var(String),
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
     Callable(String, Box<ExpressionNode>),
+    Array(Vec<Box<ExpressionNode>>),
 }
 
 pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
@@ -144,20 +145,33 @@ impl ExpressionParser {
     fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
         match token {
             TokenKind::OpenParen => {
-                let next_token = self.iterator.next().ok_or(new_error("syntax error"))?;
+                let next_token = self.iterator.next().ok_or(new_error("syntax error 3"))?;
                 //creates a bug because of precedance.
                 self.parse_expression(next_token, 1)
             }
+            TokenKind::OpenSquare => self.parse_array(),
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
             TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
             TokenKind::Callable(name) => {
-                let next_token = self.iterator.next().ok_or(new_error("syntax error"))?;
+                let next_token = self.iterator.next().ok_or(new_error("syntax error 2"))?;
                 Ok(ExpressionNode::Callable(
                     name,
                     Box::new(self.parse_expression(next_token, 1)?),
                 ))
             }
             _ => Err(new_error("syntax error: balse")),
+        }
+    }
+
+    fn parse_array(&mut self) -> Result<ExpressionNode> {
+        let mut out: Vec<Box<ExpressionNode>> = Vec::new();
+        loop {
+            let next_token = self.iterator.next().ok_or(new_error("syntax error 1"))?;
+            match next_token {
+                TokenKind::Comma => continue,
+                TokenKind::CloseSquare => break Ok(ExpressionNode::Array(out)),
+                _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
+            }
         }
     }
 
@@ -170,6 +184,10 @@ impl ExpressionParser {
                         self.iterator.next();
                         Ok(None)
                     }
+                    // maybe we can move this elsewhere, make it make more sense
+                    // or just rename the function to like check if end or something
+                    // also change how we step through the iterator maybe
+                    TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
                     _ => Err(new_error("syntax error: expected operator")),
                 }?;
                 Ok(infix.cloned()) //do a better job here
