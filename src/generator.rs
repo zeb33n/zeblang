@@ -117,20 +117,26 @@ impl Generator {
     // how to make arrays mutable -> needs more parsing!
     fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) {
         self.generate_expr(*expr);
-        self.pop("rax");
+        // needs to be [rsp + {} - rax * 8]
+        // you cant sub a register in an effective address because it could pull you out of the
+        // buffer. However, lets do something unsafe for now :')
+        self.pop("rbx");
+        self.generic("mov rax, 8");
+        self.generic("imul rbx");
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rsp");
+        self.generic("sub rax, rcx");
         let variable_position = self.variables.get(varname).unwrap();
-        //offset is the length of the array
-        let offset = 4;
         let index = format!(
-            "[rsp + {} + rax * 8]",
-            (dbg!(self.stack_pointer) - dbg!(variable_position) - offset) * 8
+            "[rax + {}]",
+            (self.stack_pointer - variable_position - 1) * 8
         );
         self.generic(format!("mov rax, {}", index).as_str());
         self.push("rax");
     }
 
     fn generate_array(&mut self, vector: Vec<Box<ExpressionNode>>) -> () {
-        for expr in vector.into_iter().rev() {
+        for expr in vector.into_iter() {
             self.generate_expr(*expr);
         }
         self.generic("mov rax, 0x21"); // 0x21 is !
@@ -226,7 +232,6 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
-        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(exit_node) => self.generate_exit(exit_node),
