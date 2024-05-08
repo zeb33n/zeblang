@@ -119,9 +119,11 @@ impl Generator {
         self.generate_expr(*expr);
         self.pop("rax");
         let variable_position = self.variables.get(varname).unwrap();
+        //offset is the length of the array
+        let offset = 4;
         let index = format!(
-            "[rsp + {} + rax * 8 - 16]",
-            (dbg!(self.stack_pointer) - dbg!(variable_position) - 1) * 8
+            "[rsp + {} + rax * 8]",
+            (dbg!(self.stack_pointer) - dbg!(variable_position) - offset) * 8
         );
         self.generic(format!("mov rax, {}", index).as_str());
         self.push("rax");
