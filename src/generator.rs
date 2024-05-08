@@ -109,9 +109,30 @@ impl Generator {
                     _ => todo!("undeclared function"),
                 }
             }
-            ExpressionNode::Array(_) => todo!(),
-            ExpressionNode::Index(..) => todo!(),
+            ExpressionNode::Array(vector) => self.generate_array(vector),
+            ExpressionNode::Index(varname, expr) => self.generate_index(&varname, expr),
         }
+    }
+
+    // how to make arrays mutable -> needs more parsing!
+    fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) {
+        self.generate_expr(*expr);
+        self.pop("rax");
+        let variable_position = self.variables.get(varname).unwrap();
+        let index = format!(
+            "[rsp + {} + rax * 8 - 16]",
+            (dbg!(self.stack_pointer) - dbg!(variable_position) - 1) * 8
+        );
+        self.generic(format!("mov rax, {}", index).as_str());
+        self.push("rax");
+    }
+
+    fn generate_array(&mut self, vector: Vec<Box<ExpressionNode>>) -> () {
+        for expr in vector.into_iter().rev() {
+            self.generate_expr(*expr);
+        }
+        self.generic("mov rax, 0x21"); // 0x21 is !
+        self.push("rax");
     }
 
     fn generate_modulo(&mut self) -> () {

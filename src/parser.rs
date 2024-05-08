@@ -145,6 +145,36 @@ impl ExpressionParser {
         .parse_expression(current_token, 1)
     }
 
+    fn parse_expression(
+        &mut self,
+        current_token: TokenKind,
+        current_precedence: u8,
+    ) -> Result<ExpressionNode> {
+        let mut expr = self.parse_expression_token(current_token);
+        // too much indent lets refactor
+        loop {
+            let infix = match self.get_infix_op()? {
+                Some(infix) => infix,
+                None => break expr,
+            };
+            let precedance = self.get_precedance(infix)?;
+            if precedance < current_precedence {
+                break expr;
+            }
+            let op_token = self.iterator.next().unwrap();
+            let infix = match op_token {
+                TokenKind::Operator(infix) => Ok(infix),
+                _ => Err(new_error("syntax error: invalid expression")),
+            }?;
+            let next_token = match self.iterator.next() {
+                Some(token) => token,
+                None => break expr,
+            };
+            let rh_expr = self.parse_expression(next_token, precedance);
+            expr = Ok(Self::make_infix(expr?, rh_expr?, infix));
+        }
+    }
+
     fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
         match token {
             TokenKind::OpenParen => {
@@ -210,9 +240,6 @@ impl ExpressionParser {
                         self.iterator.next();
                         Ok(None)
                     }
-                    // maybe we can move this elsewhere, make it make more sense
-                    // or just rename the function to like check if end or something
-                    // also change how we step through the iterator maybe.
                     // maybe we should treat range as an operator? Yes I think this is the way
                     // otherwise we'd need a new type of node. no need for the [] brackets aswell
                     TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
@@ -232,36 +259,6 @@ impl ExpressionParser {
             _ => Err(new_error(
                 format!("syntax error: unknown operator {}", infix).as_str(),
             )),
-        }
-    }
-
-    fn parse_expression(
-        &mut self,
-        current_token: TokenKind,
-        current_precedence: u8,
-    ) -> Result<ExpressionNode> {
-        let mut expr = self.parse_expression_token(current_token);
-        // too much indent lets refactor
-        loop {
-            let infix = match self.get_infix_op()? {
-                Some(infix) => infix,
-                None => break expr,
-            };
-            let precedance = self.get_precedance(infix)?;
-            if precedance < current_precedence {
-                break expr;
-            }
-            let op_token = self.iterator.next().unwrap();
-            let infix = match op_token {
-                TokenKind::Operator(infix) => Ok(infix),
-                _ => Err(new_error("syntax error: invalid expression")),
-            }?;
-            let next_token = match self.iterator.next() {
-                Some(token) => token,
-                None => break expr,
-            };
-            let rh_expr = self.parse_expression(next_token, precedance);
-            expr = Ok(Self::make_infix(expr?, rh_expr?, infix));
         }
     }
 
