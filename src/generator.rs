@@ -110,6 +110,7 @@ impl Generator {
                 }
             }
             ExpressionNode::Array(_) => todo!(),
+            ExpressionNode::Index(..) => todo!(),
         }
     }
 

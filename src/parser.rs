@@ -6,6 +6,8 @@ use crate::tokenizer::TokenKind;
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
+// this file has become a bit spaghetti and could do with a refactor
+
 #[derive(Debug)]
 pub enum StatementNode {
     Exit(ExitNode),
@@ -32,8 +34,9 @@ pub enum AssignNode {
 pub enum ExpressionNode {
     Value(String),
     Var(String),
-    Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
+    Index(String, Box<ExpressionNode>),
     Callable(String, Box<ExpressionNode>),
+    Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
     Array(Vec<Box<ExpressionNode>>),
 }
 
@@ -151,7 +154,7 @@ impl ExpressionParser {
             }
             TokenKind::OpenSquare => self.parse_array(),
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
-            TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
+            TokenKind::VarName(name) => self.parse_var(name),
             TokenKind::Callable(name) => {
                 let next_token = self.iterator.next().ok_or(new_error("syntax error 2"))?;
                 Ok(ExpressionNode::Callable(
@@ -160,6 +163,28 @@ impl ExpressionParser {
                 ))
             }
             _ => Err(new_error("syntax error: balse")),
+        }
+    }
+
+    fn parse_var(&mut self, name: String) -> Result<ExpressionNode> {
+        match self.iterator.peek() {
+            Some(token) if token == &TokenKind::OpenSquare => {
+                self.iterator.next();
+                let next = self
+                    .iterator
+                    .next()
+                    .ok_or(new_error("expected expression"))?;
+                let out = Ok(ExpressionNode::Index(
+                    name,
+                    Box::new(self.parse_expression(next, 1)?),
+                ));
+                match self.iterator.next() {
+                    Some(token) if token == TokenKind::CloseSquare => Ok(()),
+                    _ => Err(new_error("expected ]")),
+                }?;
+                out
+            }
+            _ => Ok(ExpressionNode::Var(name)),
         }
     }
 
@@ -178,6 +203,7 @@ impl ExpressionParser {
     fn get_infix_op(&mut self) -> Result<Option<String>> {
         match self.iterator.peek() {
             Some(token) => {
+                dbg!(&token);
                 let infix = match token {
                     TokenKind::Operator(infix) => Ok(Some(infix)),
                     TokenKind::CloseParen => {
@@ -186,7 +212,9 @@ impl ExpressionParser {
                     }
                     // maybe we can move this elsewhere, make it make more sense
                     // or just rename the function to like check if end or something
-                    // also change how we step through the iterator maybe
+                    // also change how we step through the iterator maybe.
+                    // maybe we should treat range as an operator? Yes I think this is the way
+                    // otherwise we'd need a new type of node. no need for the [] brackets aswell
                     TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
                     _ => Err(new_error("syntax error: expected operator")),
                 }?;
