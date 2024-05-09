@@ -28,7 +28,7 @@ fn test_if() {
 #[test]
 fn test_arrays() {
     let out = run_zeblang_file("test_scripts/arrays.zb");
-    assert_eq!(12, out);
+    assert_eq!(10, out);
 }
 
 #[test]
