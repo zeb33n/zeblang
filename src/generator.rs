@@ -93,7 +93,7 @@ impl Generator {
                     "+" => self.generic("add rax, rbx"),
                     "-" => self.generic("sub rax, rbx"),
                     "*" => self.generic("imul rbx"),
-                    "/" => self.generic("idiv rcx"),
+                    "/" => self.generic("idiv rbx"),
                     "%" => self.generate_modulo(),
                     "==" => self.generate_equality(),
                     "!=" => self.generate_inequality(),
