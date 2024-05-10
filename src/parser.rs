@@ -29,6 +29,7 @@ pub enum ExpressionNode {
     Callable(String, Box<ExpressionNode>),
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
     Array(Vec<Box<ExpressionNode>>),
+    PreAllocArray(Box<ExpressionNode>),
 }
 
 pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
@@ -145,7 +146,6 @@ impl Parser {
         current_precedence: u8,
     ) -> Result<ExpressionNode> {
         let mut expr = self.parse_expression_token(current_token);
-        // too much indent lets refactor
         loop {
             let infix = match self.get_infix_op()? {
                 Some(infix) => infix,
@@ -218,6 +218,15 @@ impl Parser {
             match next_token {
                 TokenKind::Comma => continue,
                 TokenKind::CloseSquare => break Ok(ExpressionNode::Array(out)),
+                TokenKind::Size => {
+                    let next_token = self
+                        .iterator
+                        .next()
+                        .ok_or(new_error("expected expression"))?;
+                    break Ok(ExpressionNode::PreAllocArray(Box::new(
+                        self.parse_expression(next_token, 1)?,
+                    )));
+                }
                 _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
             }
         }

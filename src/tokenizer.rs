@@ -6,6 +6,7 @@ use crate::error::new_error;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
+    Size,
     If,
     EndIf,
     Exit,
@@ -154,6 +155,7 @@ impl Lexer {
 
     fn lex_keyword(word: &str) -> TokenKind {
         match word {
+            "size" => TokenKind::Size,
             "if" => TokenKind::If,
             "fi" => TokenKind::EndIf,
             "for" => TokenKind::For,

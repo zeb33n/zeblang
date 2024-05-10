@@ -102,6 +102,7 @@ impl Generator {
                 }
             }
             ExpressionNode::Array(vector) => self.generate_array(vector),
+            ExpressionNode::PreAllocArray(expr) => todo!(),
             ExpressionNode::Index(varname, expr) => self.generate_index(&varname, expr),
         }
     }
@@ -252,6 +253,7 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
+        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
