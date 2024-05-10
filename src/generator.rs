@@ -107,7 +107,8 @@ impl Generator {
         }
     }
 
-    // how to we move the compilers stack pointer?
+    // how to we move the compilers stack pointer? perhaps impossible without using the heap?
+    // can make it so its not an expression and just hardcoded?
     fn generate_prealloc_array(&mut self, expr: Box<ExpressionNode>) -> () {
         self.generate_expr(*expr);
         self.pop("rax");
