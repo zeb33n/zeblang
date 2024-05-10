@@ -102,17 +102,30 @@ impl Generator {
                 }
             }
             ExpressionNode::Array(vector) => self.generate_array(vector),
-            ExpressionNode::PreAllocArray(expr) => todo!(),
+            ExpressionNode::PreAllocArray(expr) => self.generate_prealloc_array(expr),
             ExpressionNode::Index(varname, expr) => self.generate_index(&varname, expr),
         }
+    }
+
+    // how to we move the compilers stack pointer?
+    fn generate_prealloc_array(&mut self, expr: Box<ExpressionNode>) -> () {
+        self.generate_expr(*expr);
+        self.pop("rax");
+        self.generic("mov rbx, 0");
+        self.generic(&format!("loop{}:", self.loops));
+        self.level += 1;
+        self.generic("mov rcx, 0x21");
+        self.push("rcx");
+        self.generic("cmp rax, rbx");
+        self.generic(&format!("je exit{}", self.loops));
+        self.generic(&format!("jmp loop{}", self.loops));
+        self.level -= 1;
+        self.generic(&format!("exit{}:", self.loops));
     }
 
     // how to make arrays mutable -> needs more parsing!
     fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) {
         self.generate_expr(*expr);
-        // needs to be [rsp + {} - rax * 8]
-        // you cant sub a register in an effective address because it could pull you out of the
-        // buffer. However, lets do something unsafe for now :')
         self.pop("rbx");
         self.generic("mov rax, 8");
         self.generic("imul rbx");

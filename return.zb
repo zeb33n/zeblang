@@ -1,2 +1,3 @@
-array = [size 10 + 1]
-exit array[3]
+array = [size 10]
+array[9] = 8
+exit array[9]
