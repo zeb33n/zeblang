@@ -65,14 +65,6 @@ impl Generator {
         self.loops += 1;
     }
 
-    fn get_var_pointer(&mut self, name: &str) -> String {
-        let variable_position = self.variables.get(name).unwrap();
-        format!(
-            "[rsp + {}]",
-            (self.stack_pointer - variable_position - 1) * 8
-        )
-    }
-
     fn generate_expr(&mut self, expr: ExpressionNode) -> () {
         match expr {
             ExpressionNode::Value(value) => {
@@ -174,6 +166,14 @@ impl Generator {
         self.generic("syscall");
     }
 
+    fn get_var_pointer(&mut self, name: &str) -> String {
+        let variable_position = self.variables.get(name).unwrap();
+        format!(
+            "[rsp + {}]",
+            (self.stack_pointer - variable_position - 1) * 8
+        )
+    }
+
     fn generate_assign(&mut self, name: String, node: ExpressionNode) -> () {
         if !self.variables.contains_key(&name) {
             self.variables.insert(name, self.stack_pointer);
@@ -184,6 +184,29 @@ impl Generator {
             let var = self.get_var_pointer(&name);
             self.generic(format!("mov {}, rax", var).as_str())
         };
+    }
+
+    fn generate_assign_index(
+        &mut self,
+        name: String,
+        index_expr: ExpressionNode,
+        assign_expr: ExpressionNode,
+    ) -> () {
+        self.generate_expr(assign_expr);
+        self.generate_expr(index_expr);
+        self.pop("rcx");
+        self.pop("rbx");
+        self.generic("mov rax, 8");
+        self.generic("imul rcx");
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rsp");
+        self.generic("sub rax, rcx");
+        let variable_position = self.variables.get(&name).unwrap();
+        let pointer = format!(
+            "[rax + {}]",
+            (self.stack_pointer - variable_position - 1) * 8
+        );
+        self.generic(&format!("mov {}, rbx", pointer))
     }
 
     fn generate_while(&mut self, node: ExpressionNode) -> () {
@@ -229,7 +252,6 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
-        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
@@ -240,7 +262,9 @@ impl Generator {
                 StatementNode::EndWhile => self.generate_end_while(),
                 StatementNode::If(expr_node) => self.generate_if(expr_node),
                 StatementNode::EndIf => self.generate_end_if(),
-                StatementNode::AssignIndex(_, _, _) => todo!(),
+                StatementNode::AssignIndex(name, index_expr, assign_expr) => {
+                    self.generate_assign_index(name, index_expr, assign_expr)
+                }
             };
         }
         self.assembly.to_owned()

@@ -144,7 +144,6 @@ impl Parser {
         current_token: TokenKind,
         current_precedence: u8,
     ) -> Result<ExpressionNode> {
-        dbg!(&current_token);
         let mut expr = self.parse_expression_token(current_token);
         // too much indent lets refactor
         loop {
