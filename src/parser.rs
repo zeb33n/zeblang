@@ -118,10 +118,12 @@ impl Parser {
                     .next()
                     .ok_or_else(|| new_error("syntax error: no equals"))?;
                 let index_expr = self.parse_expression(current_token, 1)?;
+                self.iterator.next();
+                self.iterator.next();
                 let current_token = self
                     .iterator
                     .next()
-                    .ok_or_else(|| new_error("syntax error: no equals"))?;
+                    .ok_or_else(|| new_error("syntax error: expected = and expression"))?;
                 let assign_expr = self.parse_expression(current_token, 1)?;
                 Ok(StatementNode::AssignIndex(name, index_expr, assign_expr))
             }
@@ -142,6 +144,7 @@ impl Parser {
         current_token: TokenKind,
         current_precedence: u8,
     ) -> Result<ExpressionNode> {
+        dbg!(&current_token);
         let mut expr = self.parse_expression_token(current_token);
         // too much indent lets refactor
         loop {
@@ -171,7 +174,6 @@ impl Parser {
         match token {
             TokenKind::OpenParen => {
                 let next_token = self.iterator.next().ok_or(new_error("syntax error 3"))?;
-                //creates a bug because of precedance.
                 self.parse_expression(next_token, 1)
             }
             TokenKind::OpenSquare => self.parse_array(),
@@ -225,7 +227,6 @@ impl Parser {
     fn get_infix_op(&mut self) -> Result<Option<String>> {
         match self.iterator.peek() {
             Some(token) => {
-                dbg!(&token);
                 let infix = match token {
                     TokenKind::Operator(infix) => Ok(Some(infix)),
                     TokenKind::CloseParen => {
