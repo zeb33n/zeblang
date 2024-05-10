@@ -10,24 +10,15 @@ use std::vec::IntoIter;
 
 #[derive(Debug)]
 pub enum StatementNode {
-    Exit(ExitNode),
-    Assign(String, AssignNode),
+    Exit(ExpressionNode),
+    Assign(String, ExpressionNode),
+    AssignIndex(String, ExpressionNode, ExpressionNode),
     For(String, ExpressionNode),
     EndFor,
     If(ExpressionNode),
     EndIf,
     While(ExpressionNode),
     EndWhile,
-}
-
-#[derive(Debug)]
-pub enum ExitNode {
-    Expression(ExpressionNode),
-}
-
-#[derive(Debug)]
-pub enum AssignNode {
-    Expression(ExpressionNode),
 }
 
 #[derive(Debug)]
@@ -42,107 +33,108 @@ pub enum ExpressionNode {
 
 pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
     let iterator = line.into_iter();
-    do_parsing(iterator)
+    Parser::parse(iterator)
 }
 
-fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let current_token = iterator.next().ok_or_else(|| new_error("syntax error 1"))?;
-    match current_token {
-        TokenKind::Exit
-        | TokenKind::VarName(_)
-        | TokenKind::EndWhile
-        | TokenKind::While
-        | TokenKind::If
-        | TokenKind::EndIf => parse_statement(current_token, iterator),
-        _ => Err(new_error("syntax error 2")),
-    }
-}
-
-fn parse_statement(
-    current_token: TokenKind,
-    iterator: IntoIter<TokenKind>,
-) -> Result<StatementNode> {
-    match current_token {
-        TokenKind::Exit => Ok(StatementNode::Exit(parse_exit(iterator)?)),
-        TokenKind::VarName(name) => Ok(StatementNode::Assign(name, parse_assign(iterator)?)),
-        TokenKind::For => parse_for(iterator),
-        TokenKind::EndFor => Ok(StatementNode::EndFor),
-        TokenKind::While => parse_while(iterator),
-        TokenKind::EndWhile => Ok(StatementNode::EndWhile),
-        TokenKind::If => parse_if(iterator),
-        TokenKind::EndIf => Ok(StatementNode::EndIf),
-        _ => Err(new_error("syntax error 3")),
-    }
-}
-
-fn parse_for(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let varname = match iterator.next().ok_or(new_error("syntax error 4"))? {
-        TokenKind::VarName(name) => Ok(name),
-        _ => Err(new_error("syntax error 5")),
-    }?;
-    match iterator.next().ok_or(new_error("syntax error 6"))? {
-        TokenKind::In => Ok(()),
-        _ => Err(new_error("syntax Error 7")),
-    }?;
-    let current_token = iterator.next().ok_or(new_error("syntax error 8"))?;
-    Ok(StatementNode::For(
-        varname,
-        ExpressionParser::parse(iterator, current_token)?,
-    ))
-}
-
-fn parse_if(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let exp_start = iterator.next().ok_or(new_error("invalid if"))?;
-    Ok(StatementNode::If(ExpressionParser::parse(
-        iterator, exp_start,
-    )?))
-}
-
-fn parse_while(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let exp_start = iterator.next().ok_or(new_error("invalid while"))?;
-    Ok(StatementNode::While(ExpressionParser::parse(
-        iterator, exp_start,
-    )?))
-}
-
-fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
-    let current_token = iterator
-        .next()
-        .ok_or_else(|| new_error("syntax error: no equals"))?;
-    match current_token {
-        TokenKind::Assign => {
-            let current_token = iterator
-                .next()
-                .ok_or_else(|| new_error("syntax error: no equals"))?;
-            Ok(AssignNode::Expression(ExpressionParser::parse(
-                iterator,
-                current_token,
-            )?))
-        }
-        _ => Err(new_error("Invalid Token")),
-    }
-}
-
-fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
-    let err_msg = "syntax error: no exit value";
-    let current_token = iterator.next().ok_or_else(|| new_error(err_msg))?;
-    Ok(ExitNode::Expression(ExpressionParser::parse(
-        iterator,
-        current_token,
-    )?))
-}
-
-// using a struct makes it easy to move the iterator between recursive calls
-struct ExpressionParser {
+struct Parser {
     iterator: Peekable<IntoIter<TokenKind>>,
 }
 
-impl ExpressionParser {
-    fn parse(iterator: IntoIter<TokenKind>, current_token: TokenKind) -> Result<ExpressionNode> {
+impl Parser {
+    fn parse(iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
         Self {
             iterator: iterator.peekable(),
         }
-        .parse_expression(current_token, 1)
+        .do_parsing()
+    }
+
+    fn do_parsing(&mut self) -> Result<StatementNode> {
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or_else(|| new_error("syntax error 1"))?;
+        self.parse_statement(current_token)
+    }
+
+    fn parse_statement(&mut self, current_token: TokenKind) -> Result<StatementNode> {
+        match current_token {
+            TokenKind::Exit => Ok(self.parse_exit()?),
+            TokenKind::VarName(name) => Ok(self.parse_assign(name)?),
+            TokenKind::For => self.parse_for(),
+            TokenKind::EndFor => Ok(StatementNode::EndFor),
+            TokenKind::While => self.parse_while(),
+            TokenKind::EndWhile => Ok(StatementNode::EndWhile),
+            TokenKind::If => self.parse_if(),
+            TokenKind::EndIf => Ok(StatementNode::EndIf),
+            _ => Err(new_error("syntax error 3")),
+        }
+    }
+
+    fn parse_for(&mut self) -> Result<StatementNode> {
+        let varname = match self.iterator.next().ok_or(new_error("syntax error 4"))? {
+            TokenKind::VarName(name) => Ok(name),
+            _ => Err(new_error("syntax error 5")),
+        }?;
+        match self.iterator.next().ok_or(new_error("syntax error 6"))? {
+            TokenKind::In => Ok(()),
+            _ => Err(new_error("syntax Error 7")),
+        }?;
+        let current_token = self.iterator.next().ok_or(new_error("syntax error 8"))?;
+        Ok(StatementNode::For(
+            varname,
+            self.parse_expression(current_token, 1)?,
+        ))
+    }
+
+    fn parse_if(&mut self) -> Result<StatementNode> {
+        let exp_start = self.iterator.next().ok_or(new_error("invalid if"))?;
+        Ok(StatementNode::If(self.parse_expression(exp_start, 1)?))
+    }
+
+    fn parse_while(&mut self) -> Result<StatementNode> {
+        let exp_start = self.iterator.next().ok_or(new_error("invalid while"))?;
+        Ok(StatementNode::While(self.parse_expression(exp_start, 1)?))
+    }
+
+    fn parse_assign(&mut self, name: String) -> Result<StatementNode> {
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or_else(|| new_error("syntax error: no equals"))?;
+        match current_token {
+            TokenKind::Assign => {
+                let current_token = self
+                    .iterator
+                    .next()
+                    .ok_or_else(|| new_error("syntax error: no equals"))?;
+                Ok(StatementNode::Assign(
+                    name,
+                    self.parse_expression(current_token, 1)?,
+                ))
+            }
+            TokenKind::OpenSquare => {
+                let current_token = self
+                    .iterator
+                    .next()
+                    .ok_or_else(|| new_error("syntax error: no equals"))?;
+                let index_expr = self.parse_expression(current_token, 1)?;
+                let current_token = self
+                    .iterator
+                    .next()
+                    .ok_or_else(|| new_error("syntax error: no equals"))?;
+                let assign_expr = self.parse_expression(current_token, 1)?;
+                Ok(StatementNode::AssignIndex(name, index_expr, assign_expr))
+            }
+            _ => Err(new_error("Invalid Token")),
+        }
+    }
+
+    fn parse_exit(&mut self) -> Result<StatementNode> {
+        let err_msg = "syntax error: no exit value";
+        let current_token = self.iterator.next().ok_or_else(|| new_error(err_msg))?;
+        Ok(StatementNode::Exit(
+            self.parse_expression(current_token, 0)?,
+        ))
     }
 
     fn parse_expression(
@@ -240,8 +232,6 @@ impl ExpressionParser {
                         self.iterator.next();
                         Ok(None)
                     }
-                    // maybe we should treat range as an operator? Yes I think this is the way
-                    // otherwise we'd need a new type of node. no need for the [] brackets aswell
                     TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
                     _ => Err(new_error("syntax error: expected operator")),
                 }?;

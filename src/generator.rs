@@ -1,4 +1,4 @@
-use crate::parser::{AssignNode, ExitNode, ExpressionNode, StatementNode};
+use crate::parser::{ExpressionNode, StatementNode};
 
 use std::collections::HashMap;
 
@@ -167,22 +167,19 @@ impl Generator {
         self.generic("xor rax, 1");
     }
 
-    fn generate_exit(&mut self, node: ExitNode) -> () {
-        let ExitNode::Expression(expr_node) = node;
-        self.generate_expr(expr_node);
+    fn generate_exit(&mut self, node: ExpressionNode) -> () {
+        self.generate_expr(node);
         self.generic("mov rax, 60");
         self.pop("rdi");
         self.generic("syscall");
     }
 
-    fn generate_assign(&mut self, name: String, node: AssignNode) -> () {
-        let AssignNode::Expression(expr_node) = node;
-
+    fn generate_assign(&mut self, name: String, node: ExpressionNode) -> () {
         if !self.variables.contains_key(&name) {
             self.variables.insert(name, self.stack_pointer);
-            self.generate_expr(expr_node);
+            self.generate_expr(node);
         } else {
-            self.generate_expr(expr_node);
+            self.generate_expr(node);
             self.pop("rax");
             let var = self.get_var_pointer(&name);
             self.generic(format!("mov {}, rax", var).as_str())
@@ -234,14 +231,15 @@ impl Generator {
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
         for line in program.into_iter() {
             match line {
-                StatementNode::Exit(exit_node) => self.generate_exit(exit_node),
-                StatementNode::Assign(name, assign_node) => self.generate_assign(name, assign_node),
+                StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
+                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node),
                 StatementNode::For(var, expr_node) => self.generate_for(var, expr_node),
                 StatementNode::EndFor => self.generate_end_for(),
                 StatementNode::While(expr_node) => self.generate_while(expr_node),
                 StatementNode::EndWhile => self.generate_end_while(),
                 StatementNode::If(expr_node) => self.generate_if(expr_node),
                 StatementNode::EndIf => self.generate_end_if(),
+                StatementNode::AssignIndex(_, _, _) => todo!(),
             };
         }
         self.assembly.to_owned()
