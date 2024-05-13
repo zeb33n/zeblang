@@ -128,8 +128,8 @@ impl Generator {
     // how to we move the compilers stack pointer? perhaps impossible without using the heap?
     // can make it so its not an expression and just hardcoded? Add end (=0x21) keyword.
     fn generate_prealloc_array(&mut self, size: usize) -> () {
-        for _ in [0..size] {
-            self.push("0xFF")
+        for _ in 0..size {
+            self.push("0x7F")
         }
     }
 
@@ -155,7 +155,7 @@ impl Generator {
         for expr in vector.into_iter() {
             self.generate_expr(*expr);
         }
-        self.generic("mov rax, 0xFF"); // 0x21 is !
+        self.generic("mov rax, 0x7F"); // 0x21 is !
         self.push("rax");
     }
 
@@ -276,7 +276,6 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
-        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(expr_node) => self.generate_exit(expr_node),

@@ -104,7 +104,6 @@ impl Parser {
             .ok_or_else(|| new_error("syntax error: no equals"))?;
         match current_token {
             TokenKind::Assign => {
-                dbg!(&current_token);
                 let current_token = self
                     .iterator
                     .next()
