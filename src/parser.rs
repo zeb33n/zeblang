@@ -29,7 +29,7 @@ pub enum ExpressionNode {
     Callable(String, Box<ExpressionNode>),
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
     Array(Vec<Box<ExpressionNode>>),
-    PreAllocArray(Box<ExpressionNode>),
+    PreAllocArray(usize),
 }
 
 pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
@@ -104,6 +104,7 @@ impl Parser {
             .ok_or_else(|| new_error("syntax error: no equals"))?;
         match current_token {
             TokenKind::Assign => {
+                dbg!(&current_token);
                 let current_token = self
                     .iterator
                     .next()
@@ -136,7 +137,7 @@ impl Parser {
         let err_msg = "syntax error: no exit value";
         let current_token = self.iterator.next().ok_or_else(|| new_error(err_msg))?;
         Ok(StatementNode::Exit(
-            self.parse_expression(current_token, 0)?,
+            self.parse_expression(current_token, 1)?,
         ))
     }
 
@@ -219,13 +220,12 @@ impl Parser {
                 TokenKind::Comma => continue,
                 TokenKind::CloseSquare => break Ok(ExpressionNode::Array(out)),
                 TokenKind::Size => {
-                    let next_token = self
-                        .iterator
-                        .next()
-                        .ok_or(new_error("expected expression"))?;
-                    break Ok(ExpressionNode::PreAllocArray(Box::new(
-                        self.parse_expression(next_token, 1)?,
-                    )));
+                    break match self.iterator.next().ok_or(new_error("expected size"))? {
+                        TokenKind::Int(value) => {
+                            Ok(ExpressionNode::PreAllocArray(value.parse().unwrap()))
+                        }
+                        _ => Err(new_error("not a valid size")),
+                    };
                 }
                 _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
             }

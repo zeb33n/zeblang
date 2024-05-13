@@ -164,6 +164,7 @@ impl Lexer {
             "elihw" => TokenKind::EndWhile,
             "in" => TokenKind::In,
             "exit" => TokenKind::Exit,
+            "end" => TokenKind::Int("0xFF".to_string()),
             _ => TokenKind::VarName(word.to_string()),
         }
     }

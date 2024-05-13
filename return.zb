@@ -1,3 +1,13 @@
 array = [size 10]
-array[9] = 8
-exit array[9]
+i = 9
+_ = 0
+while i + 1
+  array[i] = i
+  i = i - 1
+elihw
+i = 9
+while i + 1
+  _ = print(array[i])
+  i = i - 1
+elihw
+exit 0

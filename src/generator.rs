@@ -15,8 +15,11 @@ pub struct Generator {
 
 impl Generator {
     pub fn new() -> Self {
+        let asm = String::from(
+            "section .bss\n    PRINTBUF: resb 4\nsection .text\n    global _start\n_start:\n",
+        );
         Self {
-            assembly: String::from("global _start\n_start:\n"),
+            assembly: asm,
             stack_pointer: 0,
             loops: 0,
             ifs: 0,
@@ -44,9 +47,24 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(self.level), cmd).as_str();
     }
 
-    // more research needed
+    // how to do for stuff bigger than 1 digit.
+    // also feels clunky to do twice like this is there a way to reb with a 10 at the end.
     fn parse_print(&mut self) -> () {
-        todo!();
+        self.generic("mov rax, [rsp]");
+        self.generic("add rax, 48");
+        self.generic("mov [PRINTBUF], rax");
+        self.generic("mov rax, 1"); // write command
+        self.generic("mov rdi, 1"); // stdout
+        self.generic("mov rsi, PRINTBUF");
+        self.generic("mov rdx, 10"); //length
+        self.generic("syscall");
+        self.generic("mov rax, 1"); // write command
+        self.generic("mov rdi, 1"); // stdout
+        self.generic("mov rcx, 10"); // newline
+        self.generic("mov [PRINTBUF], rcx");
+        self.generic("mov rsi, PRINTBUF");
+        self.generic("mov rdx, 10"); //length
+        self.generic("syscall");
     }
 
     // add a speacial terminator value like 0x?? or something
@@ -102,26 +120,17 @@ impl Generator {
                 }
             }
             ExpressionNode::Array(vector) => self.generate_array(vector),
-            ExpressionNode::PreAllocArray(expr) => self.generate_prealloc_array(expr),
+            ExpressionNode::PreAllocArray(size) => self.generate_prealloc_array(size),
             ExpressionNode::Index(varname, expr) => self.generate_index(&varname, expr),
         }
     }
 
     // how to we move the compilers stack pointer? perhaps impossible without using the heap?
     // can make it so its not an expression and just hardcoded? Add end (=0x21) keyword.
-    fn generate_prealloc_array(&mut self, expr: Box<ExpressionNode>) -> () {
-        self.generate_expr(*expr);
-        self.pop("rax");
-        self.generic("mov rbx, 0");
-        self.generic(&format!("loop{}:", self.loops));
-        self.level += 1;
-        self.generic("mov rcx, 0x21");
-        self.push("rcx");
-        self.generic("cmp rax, rbx");
-        self.generic(&format!("je exit{}", self.loops));
-        self.generic(&format!("jmp loop{}", self.loops));
-        self.level -= 1;
-        self.generic(&format!("exit{}:", self.loops));
+    fn generate_prealloc_array(&mut self, size: usize) -> () {
+        for _ in [0..size] {
+            self.push("0xFF")
+        }
     }
 
     // how to make arrays mutable -> needs more parsing!
@@ -146,7 +155,7 @@ impl Generator {
         for expr in vector.into_iter() {
             self.generate_expr(*expr);
         }
-        self.generic("mov rax, 0x21"); // 0x21 is !
+        self.generic("mov rax, 0xFF"); // 0x21 is !
         self.push("rax");
     }
 
