@@ -1,2 +1,8 @@
-_ = print(5)
+array = [1, 2, 30, 43, 221]
+i = 0 
+_ = 0
+while array[i] != end
+  _ = print(array[i])
+  i = i + 1
+elihw
 exit 0
