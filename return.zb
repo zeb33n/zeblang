@@ -1,2 +1,2 @@
-array = [size 3]
-exit array[2] == end
+_ = print(5)
+exit 0

@@ -16,7 +16,8 @@ pub struct Generator {
 impl Generator {
     pub fn new() -> Self {
         let asm = String::from(
-            "section .bss\n    PRINTBUF: resb 4\nsection .text\n    global _start\n_start:\n",
+            //"section .bss\n    PRINTBUF: resb 4\nsection .text\n    global _start\n_start:\n",
+            "section .data\n    msg: db 0, 0, 0, 0, 10\nsection .text\n    global _start\n_start:\n",
         );
         Self {
             assembly: asm,
@@ -47,23 +48,27 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(self.level), cmd).as_str();
     }
 
-    // how to do for stuff bigger than 1 digit.
-    // also feels clunky to do twice like this is there a way to reb with a 10 at the end.
     fn parse_print(&mut self) -> () {
-        self.generic("mov rax, [rsp]");
-        self.generic("add rax, 48");
-        self.generic("mov [PRINTBUF], rax");
-        self.generic("mov rax, 1"); // write command
-        self.generic("mov rdi, 1"); // stdout
-        self.generic("mov rsi, PRINTBUF");
-        self.generic("mov rdx, 10"); //length
-        self.generic("syscall");
-        self.generic("mov rax, 1"); // write command
-        self.generic("mov rdi, 1"); // stdout
-        self.generic("mov rcx, 10"); // newline
-        self.generic("mov [PRINTBUF], rcx");
-        self.generic("mov rsi, PRINTBUF");
-        self.generic("mov rdx, 10"); //length
+        self.generic("mov rax, [rsp]"); // load top of stack
+        self.generic("mov rbx, 100"); // get 100s
+        self.generic("idiv rbx");
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rdx");
+        self.generic("xor rdx, rdx");
+        self.generic("mov rbx, 10 "); // get 10s
+        self.generic("idiv rbx");
+        self.generic("mov rbx, rax");
+
+        self.generic("mov eax, edx");
+        self.generic("shl eax, 16");
+        self.generic("mov ah, bl");
+        self.generic("mov al, cl");
+        self.generic("add eax, '000'");
+        self.generic("mov [msg], eax");
+        self.generic("mov rax, 1 ");
+        self.generic("mov rdi, 1 ");
+        self.generic("mov rsi, msg ");
+        self.generic("mov rdx, 5");
         self.generic("syscall");
     }
 
@@ -128,7 +133,7 @@ impl Generator {
     // how to we move the compilers stack pointer? perhaps impossible without using the heap?
     // can make it so its not an expression and just hardcoded? Add end (=0x21) keyword.
     fn generate_prealloc_array(&mut self, size: usize) -> () {
-        for _ in 0..size {
+        for _ in 0..size + 1 {
             self.push("0x7F")
         }
     }
