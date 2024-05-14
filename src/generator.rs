@@ -49,6 +49,7 @@ impl Generator {
     }
 
     // prints 9 as 009 fix this.
+    // breaks in loops ?!
     fn parse_print(&mut self) -> () {
         self.generic("mov rax, [rsp]"); // load top of stack
         self.generic("mov rbx, 100"); // get 100s
@@ -70,6 +71,10 @@ impl Generator {
         self.generic("mov rsi, msg ");
         self.generic("mov rdx, 5");
         self.generic("syscall");
+        self.generic("xor rax, rax");
+        self.generic("xor rbx, rbx");
+        self.generic("xor rcx, rcx");
+        self.generic("xor rdx, rdx");
     }
 
     fn parse_range(&mut self) -> () {
