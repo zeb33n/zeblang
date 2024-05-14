@@ -48,22 +48,22 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(self.level), cmd).as_str();
     }
 
+    // prints 9 as 009 fix this.
     fn parse_print(&mut self) -> () {
         self.generic("mov rax, [rsp]"); // load top of stack
         self.generic("mov rbx, 100"); // get 100s
         self.generic("idiv rbx");
-        self.generic("mov rcx, rax");
-        self.generic("mov rax, rdx");
+        self.generic("mov rcx, rax"); // save hundreds to rcx
+        self.generic("mov rax, rdx"); // move remainder to rax
         self.generic("xor rdx, rdx");
         self.generic("mov rbx, 10 "); // get 10s
         self.generic("idiv rbx");
-        self.generic("mov rbx, rax");
-
-        self.generic("mov eax, edx");
-        self.generic("shl eax, 16");
-        self.generic("mov ah, bl");
-        self.generic("mov al, cl");
-        self.generic("add eax, '000'");
+        self.generic("mov rbx, rax"); // save 10s to rbx
+        self.generic("mov eax, edx"); // load remainder into eax
+        self.generic("shl eax, 16"); // move remainder 2 bytes left
+        self.generic("mov ah, bl"); // load 10s 1 byte from the end
+        self.generic("mov al, cl"); // load 100s
+        self.generic("add eax, '000'"); // convert to ascii
         self.generic("mov [msg], eax");
         self.generic("mov rax, 1 ");
         self.generic("mov rdi, 1 ");
@@ -72,7 +72,6 @@ impl Generator {
         self.generic("syscall");
     }
 
-    // add a speacial terminator value like 0x?? or something
     fn parse_range(&mut self) -> () {
         self.pop("rax");
         self.generic("mov rbx, 0");
