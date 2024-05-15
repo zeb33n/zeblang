@@ -9,5 +9,5 @@ echo "output: $?"
 
 #cleanup
 #rm ${1%.zb}.asm
-#rm ${1%.zb}.o
+rm ${1%.zb}.o
 #rm ${1%.zb}

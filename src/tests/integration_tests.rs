@@ -20,6 +20,12 @@ fn run_zeblang_file(addr: &str) -> u8 {
 }
 
 #[test]
+fn test_if() {
+    let out = run_zeblang_file("test_scripts/if.zb");
+    assert_eq!(3, out);
+}
+
+#[test]
 fn test_while() {
     let out = run_zeblang_file("test_scripts/while.zb");
     assert_eq!(12, out);

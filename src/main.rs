@@ -2,7 +2,7 @@ use std::env;
 use std::io::Result;
 
 mod tokenizer;
-use tokenizer::tokenize;
+use tokenizer::Lexer;
 
 mod local_client;
 use local_client::{read_file, write_assembly_file};
@@ -22,12 +22,12 @@ fn main() -> Result<()> {
         _ => panic!("incorrect usage. correct usage is: \nzeb <file.zb>"),
     };
     let code = read_file(filename);
-    let parse_tree: Vec<StatementNode> = code
+    let parse_tree: Result<Vec<StatementNode>> = code
         .into_iter()
-        .map(|line| parse(tokenize(line)).unwrap())
+        .map(|line| Ok(parse(Lexer::lex(line)?)?))
         .collect();
     let mut generator = Generator::new();
-    let assembly = generator.generate(parse_tree);
+    let assembly = generator.generate(parse_tree?);
     write_assembly_file(&filename, assembly)?;
     Ok(())
 }
