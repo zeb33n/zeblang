@@ -29,7 +29,7 @@ fn main() -> Result<()> {
         .collect();
 
     match json {
-        Some(_) => write_json(filename, parse_tree?)?,
+        Some(_) => write_json(filename, parse_tree)?,
         None => {
             let mut generator = Generator::new();
             let assembly = generator.generate(parse_tree?);

@@ -11,13 +11,16 @@ pub fn read_file(filename: &str) -> Vec<String> {
     }
 }
 
-pub fn write_json(filename: &str, program: Vec<StatementNode>) -> Result<()> {
+pub fn write_json(filename: &str, program: Result<Vec<StatementNode>>) -> Result<()> {
     let mut file = File::create(format!(
         "{}{}",
         filename.split(".").next().unwrap(),
         ".json"
     ))?;
-    let json = serde_json::to_string_pretty(&program)?;
+    let json = match program {
+        Ok(program) => serde_json::to_string_pretty(&program)?,
+        Err(e) => serde_json::to_string_pretty(&e.to_string())?,
+    };
     file.write_all(json.as_bytes())?;
     Ok(())
 }
