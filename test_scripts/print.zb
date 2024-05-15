@@ -1,6 +1,6 @@
-out = [1, 201, 321, 10, 11]
+out = [1, 201, 321, 10, 11, 0]
 i = 0
-_ = 0
+_ = print(42)
 while out[i] != end
   _ = print(out[i])
   i = i + 1

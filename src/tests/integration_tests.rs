@@ -91,12 +91,12 @@ fn test_print() {
         .output()
         .expect("failed");
     let out_slice = &String::from_utf8_lossy(&output.stdout)
-        .replace("\n", "")
+        .replace("\0", "")
         .rsplit_once("...")
         .unwrap()
         .1
-        .rsplit("\0")
+        .rsplit("\n")
         .map(|s| s.to_string())
-        .collect::<Vec<_>>()[1..6];
-    assert_eq!(out_slice, ["011", "010", "321", "201", "001"])
+        .collect::<Vec<_>>()[2..9];
+    assert_eq!(out_slice, ["0", "11", "10", "321", "201", "1", "42"])
 }

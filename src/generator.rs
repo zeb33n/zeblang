@@ -9,6 +9,7 @@ pub struct Generator {
     loops: usize,
     ifs: usize,
     equalitys: usize,
+    prints: usize,
     level: usize,
     variables: HashMap<String, usize>,
 }
@@ -16,7 +17,6 @@ pub struct Generator {
 impl Generator {
     pub fn new() -> Self {
         let asm = String::from(
-            //"section .bss\n    PRINTBUF: resb 4\nsection .text\n    global _start\n_start:\n",
             "section .data\n    msg: db 0, 0, 0, 0, 10\nsection .text\n    global _start\n_start:\n",
         );
         Self {
@@ -25,6 +25,7 @@ impl Generator {
             loops: 0,
             ifs: 0,
             equalitys: 0,
+            prints: 0,
             level: 1,
             variables: HashMap::new(),
         }
@@ -48,8 +49,6 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(self.level), cmd).as_str();
     }
 
-    // prints 9 as 009 fix this.
-    // breaks in loops ?!
     fn parse_print(&mut self) -> () {
         self.generic("mov rax, [rsp]"); // load top of stack
         self.generic("mov rbx, 100"); // get 100s
@@ -60,12 +59,26 @@ impl Generator {
         self.generic("mov rbx, 10 "); // get 10s
         self.generic("idiv rbx");
         self.generic("mov rbx, rax"); // save 10s to rbx
-        self.generic("mov eax, edx"); // load remainder into eax
+        self.generic("mov eax, edx"); // load remainder
+        self.generic("add eax, '0'"); // convert to ascii
         self.generic("shl eax, 16"); // move remainder 2 bytes left
         self.generic("mov ah, bl"); // load 10s 1 byte from the end
         self.generic("mov al, cl"); // load 100s
-        self.generic("add eax, '000'"); // convert to ascii
-        self.generic("mov [msg], eax");
+                                    // if not zero convert to ascii
+        self.generic("cmp al, 0");
+        self.generic(&format!("je DIG2ASCII{}", self.prints));
+        self.generic("add eax, '00'"); // convert to ascii
+        self.generic(&format!("jmp ASCIIEX{}", self.prints));
+        // repeat for 10s
+        self.generic(&format!("DIG2ASCII{}:", self.prints));
+        self.level += 1;
+        self.generic("cmp ah, 0");
+        self.generic(&format!("je ASCIIEX{}", self.prints));
+        self.generic("add ah, '0'");
+        self.level -= 1;
+
+        self.generic(&format!("ASCIIEX{}:", self.prints));
+        self.generic("mov [msg], eax"); // load eax into msg
         self.generic("mov rax, 1 ");
         self.generic("mov rdi, 1 ");
         self.generic("mov rsi, msg ");
@@ -75,6 +88,7 @@ impl Generator {
         self.generic("xor rbx, rbx");
         self.generic("xor rcx, rcx");
         self.generic("xor rdx, rdx");
+        self.prints += 1;
     }
 
     fn parse_range(&mut self) -> () {
