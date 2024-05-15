@@ -1,0 +1,4 @@
+array_1 = [1, 2, 3, 4]
+array_2 = [0, 2, 3, 4, 1]
+array_1[2 + array_2[4]] = array_1[1] * 4
+exit array_1[3] 

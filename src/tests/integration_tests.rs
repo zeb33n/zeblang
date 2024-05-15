@@ -26,6 +26,18 @@ fn test_if() {
 }
 
 #[test]
+fn test_arrays() {
+    let out = run_zeblang_file("test_scripts/arrays.zb");
+    assert_eq!(10, out);
+}
+
+#[test]
+fn test_mut_arrays() {
+    let out = run_zeblang_file("test_scripts/mut_arrays.zb");
+    assert_eq!(8, out);
+}
+
+#[test]
 fn test_while() {
     let out = run_zeblang_file("test_scripts/while.zb");
     assert_eq!(12, out);

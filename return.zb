@@ -1,10 +1,13 @@
-maybe_prime = 127
-i = 3
-out = 1
-while i != maybe_prime
-  if maybe_prime % i == 0
-    out = 0
-  fi
+cfib = 1
+lfib = 1
+holder = 0
+i = 0
+_ = 0 
+while i != 20
   i = i + 1
+  _ = print(lfib)
+  holder = cfib
+  cfib = cfib + lfib 
+  lfib = holder
 elihw
-exit out
+exit 0
