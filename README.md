@@ -1,6 +1,17 @@
 # ZebLang!
 Welcome to a very basic programming language WIP. Some of these features are only found on the development branch!
 
+## Installation. 
+first clone this repo 
+``` git clone https://github.com/zeb33n/zeblang.git ```
+then you can build from source using cargo 
+``` cargo build --release ```
+the executable will be found inside `target/release` it is called `zeblang` add this to your `PATH` in `.bashrc`
+Nice you can now run zeblang
+
+``` zeblang file.zb ``` to get the .asm file 
+``` zeblang file.zb -j ``` to get the parse tree back as a .json
+
 ## Features!
 ### Assigning Variables
 you can assign variables like so `x = 2`, you can also assign variables as a copy of another variable `y = x`
