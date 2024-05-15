@@ -6,9 +6,9 @@ use crate::tokenizer::TokenKind;
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-// this file has become a bit spaghetti and could do with a refactor
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum StatementNode {
     Exit(ExpressionNode),
     Assign(String, ExpressionNode),
@@ -21,7 +21,7 @@ pub enum StatementNode {
     EndWhile,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum ExpressionNode {
     Value(String),
     Var(String),
