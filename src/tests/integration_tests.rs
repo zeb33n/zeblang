@@ -71,7 +71,7 @@ fn test_variables() {
 #[test]
 fn test_json_syntax_error() {
     let out = run_zeblang_file_json("test_scripts/syntax_error.zb");
-    assert_eq!("\"syntax error: expected operator\"".to_string(), out);
+    assert_eq!("\"2: expected operator\"".to_string(), out);
 }
 
 #[test]

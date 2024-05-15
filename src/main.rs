@@ -25,7 +25,8 @@ fn main() -> Result<()> {
     let code = read_file(filename);
     let parse_tree: Result<Vec<StatementNode>> = code
         .into_iter()
-        .map(|line| Ok(parse(Lexer::lex(line)?)?))
+        .enumerate()
+        .map(|(line_num, line)| Ok(parse(Lexer::lex(line)?, line_num + 1)?))
         .collect();
 
     match json {

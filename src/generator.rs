@@ -49,6 +49,8 @@ impl Generator {
         self.assembly += format!("{}{}\n", Self::indent(self.level), cmd).as_str();
     }
 
+    // should make this work for arbitary digits but this is fine for now
+    // (even if it is 40 lines long lol)
     fn parse_print(&mut self) -> () {
         self.generic("mov rax, [rsp]"); // load top of stack
         self.generic("mov rbx, 100"); // get 100s
