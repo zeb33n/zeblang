@@ -1,15 +1,18 @@
 use std::io::Result;
 
-use crate::error::new_error;
+use crate::error::syntax_error;
 use crate::tokenizer::TokenKind;
 
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-#[derive(Debug)]
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
 pub enum StatementNode {
-    Exit(ExitNode),
-    Assign(String, AssignNode),
+    Exit(ExpressionNode),
+    Assign(String, ExpressionNode),
+    AssignIndex(String, ExpressionNode, ExpressionNode),
     For(String, ExpressionNode),
     EndFor,
     If(ExpressionNode),
@@ -18,175 +21,145 @@ pub enum StatementNode {
     EndWhile,
 }
 
-#[derive(Debug)]
-pub enum ExitNode {
-    Expression(ExpressionNode),
-}
-
-#[derive(Debug)]
-pub enum AssignNode {
-    Expression(ExpressionNode),
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum ExpressionNode {
     Value(String),
     Var(String),
-    Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
+    Index(String, Box<ExpressionNode>),
     Callable(String, Box<ExpressionNode>),
+    Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
+    Array(Vec<Box<ExpressionNode>>),
+    PreAllocArray(usize),
 }
 
-pub fn parse(line: Vec<TokenKind>) -> Result<StatementNode> {
+pub fn parse(line: Vec<TokenKind>, line_num: usize) -> Result<StatementNode> {
     let iterator = line.into_iter();
-    do_parsing(iterator)
+    Parser::parse(iterator, line_num)
 }
 
-fn do_parsing(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let current_token = iterator.next().ok_or_else(|| new_error("syntax error 1"))?;
-    match current_token {
-        TokenKind::Exit
-        | TokenKind::VarName(_)
-        | TokenKind::EndWhile
-        | TokenKind::While
-        | TokenKind::If
-        | TokenKind::EndIf => parse_statement(current_token, iterator),
-        _ => Err(new_error("syntax error 2")),
-    }
-}
-
-fn parse_statement(
-    current_token: TokenKind,
-    iterator: IntoIter<TokenKind>,
-) -> Result<StatementNode> {
-    match current_token {
-        TokenKind::Exit => Ok(StatementNode::Exit(parse_exit(iterator)?)),
-        TokenKind::VarName(name) => Ok(StatementNode::Assign(name, parse_assign(iterator)?)),
-        TokenKind::For => parse_for(iterator),
-        TokenKind::EndFor => Ok(StatementNode::EndFor),
-        TokenKind::While => parse_while(iterator),
-        TokenKind::EndWhile => Ok(StatementNode::EndWhile),
-        TokenKind::If => parse_if(iterator),
-        TokenKind::EndIf => Ok(StatementNode::EndIf),
-        _ => Err(new_error("syntax error 3")),
-    }
-}
-
-fn parse_for(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let varname = match iterator.next().ok_or(new_error("syntax error 4"))? {
-        TokenKind::VarName(name) => Ok(name),
-        _ => Err(new_error("syntax error 5")),
-    }?;
-    match iterator.next().ok_or(new_error("syntax error 6"))? {
-        TokenKind::In => Ok(()),
-        _ => Err(new_error("syntax Error 7")),
-    }?;
-    let current_token = iterator.next().ok_or(new_error("syntax error 8"))?;
-    Ok(StatementNode::For(
-        varname,
-        ExpressionParser::parse(iterator, current_token)?,
-    ))
-}
-
-fn parse_if(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let exp_start = iterator.next().ok_or(new_error("invalid if"))?;
-    Ok(StatementNode::If(ExpressionParser::parse(
-        iterator, exp_start,
-    )?))
-}
-
-fn parse_while(mut iterator: IntoIter<TokenKind>) -> Result<StatementNode> {
-    let exp_start = iterator.next().ok_or(new_error("invalid while"))?;
-    Ok(StatementNode::While(ExpressionParser::parse(
-        iterator, exp_start,
-    )?))
-}
-
-fn parse_assign(mut iterator: IntoIter<TokenKind>) -> Result<AssignNode> {
-    let current_token = iterator
-        .next()
-        .ok_or_else(|| new_error("syntax error: no equals"))?;
-    match current_token {
-        TokenKind::Assign => {
-            let current_token = iterator
-                .next()
-                .ok_or_else(|| new_error("syntax error: no equals"))?;
-            Ok(AssignNode::Expression(ExpressionParser::parse(
-                iterator,
-                current_token,
-            )?))
-        }
-        _ => Err(new_error("Invalid Token")),
-    }
-}
-
-fn parse_exit(mut iterator: IntoIter<TokenKind>) -> Result<ExitNode> {
-    let err_msg = "syntax error: no exit value";
-    let current_token = iterator.next().ok_or_else(|| new_error(err_msg))?;
-    Ok(ExitNode::Expression(ExpressionParser::parse(
-        iterator,
-        current_token,
-    )?))
-}
-
-// using a struct makes it easy to move the iterator between recursive calls
-struct ExpressionParser {
+struct Parser {
     iterator: Peekable<IntoIter<TokenKind>>,
+    line: usize,
 }
 
-impl ExpressionParser {
-    fn parse(iterator: IntoIter<TokenKind>, current_token: TokenKind) -> Result<ExpressionNode> {
+impl Parser {
+    fn parse(iterator: IntoIter<TokenKind>, line_num: usize) -> Result<StatementNode> {
         Self {
             iterator: iterator.peekable(),
+            line: line_num,
         }
-        .parse_expression(current_token, 1)
+        .do_parsing()
     }
 
-    fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
-        match token {
-            TokenKind::OpenParen => {
-                let next_token = self.iterator.next().ok_or(new_error("syntax error"))?;
-                //creates a bug because of precedance.
-                self.parse_expression(next_token, 1)
-            }
-            TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
-            TokenKind::VarName(name) => Ok(ExpressionNode::Var(name)),
-            TokenKind::Callable(name) => {
-                let next_token = self.iterator.next().ok_or(new_error("syntax error"))?;
-                Ok(ExpressionNode::Callable(
+    fn do_parsing(&mut self) -> Result<StatementNode> {
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or(syntax_error("no tokens found", self.line))?;
+        self.parse_statement(current_token)
+    }
+
+    fn parse_statement(&mut self, current_token: TokenKind) -> Result<StatementNode> {
+        match current_token {
+            TokenKind::Exit => Ok(self.parse_exit()?),
+            TokenKind::VarName(name) => Ok(self.parse_assign(name)?),
+            TokenKind::For => self.parse_for(),
+            TokenKind::EndFor => Ok(StatementNode::EndFor),
+            TokenKind::While => self.parse_while(),
+            TokenKind::EndWhile => Ok(StatementNode::EndWhile),
+            TokenKind::If => self.parse_if(),
+            TokenKind::EndIf => Ok(StatementNode::EndIf),
+            _ => Err(syntax_error("not a valid line start", self.line)),
+        }
+    }
+
+    fn parse_for(&mut self) -> Result<StatementNode> {
+        let varname = match self
+            .iterator
+            .next()
+            .ok_or(syntax_error("expected var name", self.line))?
+        {
+            TokenKind::VarName(name) => Ok(name),
+            _ => Err(syntax_error("not a valid varname", self.line)),
+        }?;
+        match self
+            .iterator
+            .next()
+            .ok_or(syntax_error("expected in", self.line))?
+        {
+            TokenKind::In => Ok(()),
+            _ => Err(syntax_error("expected in", self.line)),
+        }?;
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or(syntax_error("expected arraylike", self.line))?;
+        Ok(StatementNode::For(
+            varname,
+            self.parse_expression(current_token, 1)?,
+        ))
+    }
+
+    fn parse_if(&mut self) -> Result<StatementNode> {
+        let exp_start = self
+            .iterator
+            .next()
+            .ok_or(syntax_error("expected expression", self.line))?;
+        Ok(StatementNode::If(self.parse_expression(exp_start, 1)?))
+    }
+
+    fn parse_while(&mut self) -> Result<StatementNode> {
+        let exp_start = self
+            .iterator
+            .next()
+            .ok_or(syntax_error("expected expression", self.line))?;
+        Ok(StatementNode::While(self.parse_expression(exp_start, 1)?))
+    }
+
+    fn parse_assign(&mut self, name: String) -> Result<StatementNode> {
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or_else(|| syntax_error("expected =", self.line))?;
+        match current_token {
+            TokenKind::Assign => {
+                let current_token = self
+                    .iterator
+                    .next()
+                    .ok_or_else(|| syntax_error("expected expression", self.line))?;
+                Ok(StatementNode::Assign(
                     name,
-                    Box::new(self.parse_expression(next_token, 1)?),
+                    self.parse_expression(current_token, 1)?,
                 ))
             }
-            _ => Err(new_error("syntax error: balse")),
-        }
-    }
-
-    fn get_infix_op(&mut self) -> Result<Option<String>> {
-        match self.iterator.peek() {
-            Some(token) => {
-                let infix = match token {
-                    TokenKind::Operator(infix) => Ok(Some(infix)),
-                    TokenKind::CloseParen => {
-                        self.iterator.next();
-                        Ok(None)
-                    }
-                    _ => Err(new_error("syntax error: expected operator")),
-                }?;
-                Ok(infix.cloned()) //do a better job here
+            TokenKind::OpenSquare => {
+                let current_token = self
+                    .iterator
+                    .next()
+                    .ok_or_else(|| syntax_error("expected expression", self.line))?;
+                let index_expr = self.parse_expression(current_token, 1)?;
+                self.iterator.next();
+                self.iterator.next();
+                let current_token = self
+                    .iterator
+                    .next()
+                    .ok_or_else(|| syntax_error("expected = and expression", self.line))?;
+                let assign_expr = self.parse_expression(current_token, 1)?;
+                Ok(StatementNode::AssignIndex(name, index_expr, assign_expr))
             }
-            None => Ok(None),
+            _ => Err(syntax_error("Invalid Token", self.line)),
         }
     }
 
-    fn get_precedance(&mut self, infix: String) -> Result<u8> {
-        match infix.as_str() {
-            "==" | "!=" => Ok(1),
-            "+" | "-" => Ok(2),
-            "*" | "/" | "%" => Ok(3),
-            _ => Err(new_error(
-                format!("syntax error: unknown operator {}", infix).as_str(),
-            )),
-        }
+    fn parse_exit(&mut self) -> Result<StatementNode> {
+        let err_msg = "expected expression";
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or_else(|| syntax_error(err_msg, self.line))?;
+        Ok(StatementNode::Exit(
+            self.parse_expression(current_token, 1)?,
+        ))
     }
 
     fn parse_expression(
@@ -195,7 +168,6 @@ impl ExpressionParser {
         current_precedence: u8,
     ) -> Result<ExpressionNode> {
         let mut expr = self.parse_expression_token(current_token);
-        // too much indent lets refactor
         loop {
             let infix = match self.get_infix_op()? {
                 Some(infix) => infix,
@@ -208,7 +180,7 @@ impl ExpressionParser {
             let op_token = self.iterator.next().unwrap();
             let infix = match op_token {
                 TokenKind::Operator(infix) => Ok(infix),
-                _ => Err(new_error("syntax error: invalid expression")),
+                _ => Err(syntax_error("invalid infix op", self.line)),
             }?;
             let next_token = match self.iterator.next() {
                 Some(token) => token,
@@ -216,6 +188,111 @@ impl ExpressionParser {
             };
             let rh_expr = self.parse_expression(next_token, precedance);
             expr = Ok(Self::make_infix(expr?, rh_expr?, infix));
+        }
+    }
+
+    fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
+        match token {
+            TokenKind::OpenParen => {
+                let next_token = self
+                    .iterator
+                    .next()
+                    .ok_or(syntax_error("expected expression", self.line))?;
+                self.parse_expression(next_token, 1)
+            }
+            TokenKind::OpenSquare => self.parse_array(),
+            TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
+            TokenKind::VarName(name) => self.parse_var(name),
+            TokenKind::Callable(name) => {
+                let next_token = self
+                    .iterator
+                    .next()
+                    .ok_or(syntax_error("expected expression", self.line))?;
+                Ok(ExpressionNode::Callable(
+                    name,
+                    Box::new(self.parse_expression(next_token, 1)?),
+                ))
+            }
+            _ => Err(syntax_error("invalid expression", self.line)),
+        }
+    }
+
+    fn parse_var(&mut self, name: String) -> Result<ExpressionNode> {
+        match self.iterator.peek() {
+            Some(token) if token == &TokenKind::OpenSquare => {
+                self.iterator.next();
+                let next = self
+                    .iterator
+                    .next()
+                    .ok_or(syntax_error("expected expression", self.line))?;
+                let out = Ok(ExpressionNode::Index(
+                    name,
+                    Box::new(self.parse_expression(next, 1)?),
+                ));
+                match self.iterator.next() {
+                    Some(token) if token == TokenKind::CloseSquare => Ok(()),
+                    _ => Err(syntax_error("expected ]", self.line)),
+                }?;
+                out
+            }
+            _ => Ok(ExpressionNode::Var(name)),
+        }
+    }
+
+    fn parse_array(&mut self) -> Result<ExpressionNode> {
+        let mut out: Vec<Box<ExpressionNode>> = Vec::new();
+        loop {
+            let next_token = self
+                .iterator
+                .next()
+                .ok_or(syntax_error("expected expression", self.line))?;
+            match next_token {
+                TokenKind::Comma => continue,
+                TokenKind::CloseSquare => break Ok(ExpressionNode::Array(out)),
+                TokenKind::Size => {
+                    break match self
+                        .iterator
+                        .next()
+                        .ok_or(syntax_error("expected size", self.line))?
+                    {
+                        TokenKind::Int(value) => {
+                            Ok(ExpressionNode::PreAllocArray(value.parse().unwrap()))
+                        }
+                        _ => Err(syntax_error("not a valid size", self.line)),
+                    };
+                }
+                _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
+            }
+        }
+    }
+
+    fn get_infix_op(&mut self) -> Result<Option<String>> {
+        match self.iterator.peek() {
+            Some(token) => {
+                let infix = match token {
+                    TokenKind::Operator(infix) => Ok(Some(infix)),
+                    TokenKind::CloseParen => {
+                        self.iterator.next();
+                        Ok(None)
+                    }
+                    TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
+                    _ => Err(syntax_error("expected operator", self.line)),
+                }?;
+                Ok(infix.cloned()) //do a better job here
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn get_precedance(&mut self, infix: String) -> Result<u8> {
+        match infix.as_str() {
+            "==" | "!=" => Ok(1),
+            "+" | "-" => Ok(2),
+            "*" | "/" | "%" => Ok(3),
+            _ => Err(syntax_error(
+                format!("unknown operator {}", infix).as_str(),
+                self.line,
+            )),
         }
     }
 

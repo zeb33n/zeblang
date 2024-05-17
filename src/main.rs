@@ -1,11 +1,11 @@
-use std::env;
 use std::io::Result;
 
 mod tokenizer;
+use error::new_error;
 use tokenizer::Lexer;
 
 mod local_client;
-use local_client::{read_file, write_assembly_file};
+use local_client::{read_file, write_assembly_file, write_json};
 
 mod parser;
 use parser::{parse, StatementNode};
@@ -15,20 +15,30 @@ mod error;
 mod generator;
 use generator::Generator;
 
+mod arg_parser;
+use arg_parser::parse_args;
+
+// loop through args so order soesnt matter
 fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let filename = match &args[..] {
-        [_, filename] => filename,
-        _ => panic!("incorrect usage. correct usage is: \nzeb <file.zb>"),
-    };
+    let args = parse_args();
+    let filename = args.get("filename").ok_or(new_error("incorrect usage"))?;
+
     let code = read_file(filename);
+    // collect the errors into a vec of errors
     let parse_tree: Result<Vec<StatementNode>> = code
         .into_iter()
-        .map(|line| Ok(parse(Lexer::lex(line)?)?))
+        .enumerate()
+        .map(|(line_num, line)| Ok(parse(Lexer::lex(line)?, line_num + 1)?))
         .collect();
-    let mut generator = Generator::new();
-    let assembly = generator.generate(parse_tree?);
-    write_assembly_file(&filename, assembly)?;
+
+    match args.get("json") {
+        Some(_) => write_json(filename, parse_tree)?,
+        None => {
+            let mut generator = Generator::new();
+            let assembly = generator.generate(parse_tree?);
+            write_assembly_file(&filename, assembly)?;
+        }
+    }
     Ok(())
 }
 
