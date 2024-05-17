@@ -1,13 +1,3 @@
-cfib = 1
-lfib = 1
-holder = 0
-i = 0
-_ = 0 
-while i != 20
-  i = i + 1
-  _ = print(lfib)
-  holder = cfib
-  cfib = cfib + lfib 
-  lfib = holder
-elihw
-exit 0
+out = 1 + 2 * 3 - 4
+array = 2
+array[0] = out
