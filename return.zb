@@ -1,5 +1,5 @@
 _ = 0
-for i in [1, 2, 3]
- _ = print(i)
-rof
+array = [3, 6, 9]
+array_2 = array
+_ = print(array_2[0])
 exit 0

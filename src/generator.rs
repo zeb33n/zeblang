@@ -293,6 +293,7 @@ impl Generator {
 
     // should be able to raise an error
     // get rid of clone
+    // arrays are broken. when reassigned only a referance to the first value is given.
     fn generate_for(&mut self, varname: String, node: ExpressionNode) -> () {
         // init var, pointer and loop
         self.generate_assign(format!("!LOOPARRAY{}", self.loops), node);
