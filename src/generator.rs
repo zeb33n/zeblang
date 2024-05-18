@@ -291,13 +291,50 @@ impl Generator {
         self.ifs += 1;
     }
 
-    fn generate_for(&mut self, var: String, node: ExpressionNode) -> () {
-        (var, node); //silence warnings
-        todo!()
+    // should be able to raise an error
+    // get rid of clone
+    fn generate_for(&mut self, varname: String, node: ExpressionNode) -> () {
+        // init var, pointer and loop
+        self.generate_assign(format!("!LOOPARRAY{}", self.loops), node);
+        self.generate_assign(varname.clone(), ExpressionNode::Value("0x7F".to_string()));
+        self.generic("mov r8, 0");
+        self.generic(&format!("FOR{}:", self.loops));
+        self.level += 1;
+
+        // increment array pointer and move value to var
+        self.generic("mov rcx, r8");
+        self.generic("mov rax, 8");
+        self.generic("imul rcx");
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rsp");
+        self.generic("sub rax, rcx");
+        let variable_position = self
+            .variables
+            .get(&format!("!LOOPARRAY{}", self.loops))
+            .unwrap();
+        let pointer = format!(
+            "[rax + {}]",
+            (self.stack_pointer - variable_position - 1) * 8
+        );
+        let var = self.get_var_pointer(&varname);
+        self.generic(&format!("mov rax, {}", pointer));
+        self.generic(&format!("mov {}, rax", var));
+        self.generic("inc r8");
+        self.generic("xor rax, rax");
+        self.generic("xor rcx, rcx");
+
+        // are we at the end of the loop
+        self.generic(&format!("mov rax, {}", var));
+        self.generic("cmp rax, 0x7F");
+        self.generic(&format!("je ENDFOR{}", self.loops));
+        self.generic("xor rax, rax");
     }
 
     fn generate_end_for(&mut self) -> () {
-        todo!()
+        self.generic(&format!("jmp FOR{}", self.loops));
+        self.level -= 1;
+        self.generic(&format!("ENDFOR{}:", self.loops));
+        self.loops += 1;
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
