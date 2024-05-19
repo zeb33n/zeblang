@@ -160,7 +160,6 @@ impl Generator {
         }
     }
 
-    // how to make arrays mutable -> needs more parsing!
     fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) {
         self.generate_expr(*expr);
         self.pop("rbx");
@@ -182,7 +181,7 @@ impl Generator {
         for expr in vector.into_iter() {
             self.generate_expr(*expr);
         }
-        self.generic("mov rax, 0x7F"); // 0x21 is !
+        self.generic("mov rax, 0x7F");
         self.push("rax");
     }
 
@@ -296,6 +295,8 @@ impl Generator {
     // should be able to raise an error
     // get rid of clone
     // arrays are broken. when reassigned only a referance to the first value is given.
+    // need to add types decide how to implement array assigns -> pointer or copy -> maybe some
+    // nice syntax.
     fn generate_for(&mut self, varname: String, node: ExpressionNode) -> () {
         // init var, pointer and loop
         self.generate_assign(format!("!LOOPARRAY{}", self.loops), node);

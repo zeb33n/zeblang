@@ -33,6 +33,12 @@ fn run_zeblang_file_json(addr: &str) -> String {
 }
 
 #[test]
+fn test_for() {
+    let out = run_zeblang_file("test_scripts/for.zb");
+    assert_eq!(8, out);
+}
+
+#[test]
 fn test_if() {
     let out = run_zeblang_file("test_scripts/if.zb");
     assert_eq!(3, out);
