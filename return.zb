@@ -1,5 +1,6 @@
-_ = 0
-array = [3, 6, 9]
-array_2 = array
-_ = print(array_2[0])
+_ = print(211)
+for num in [3, 606, 90]
+  _ = print(num)
+rof
+_ = print(121)
 exit 0

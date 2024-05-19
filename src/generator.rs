@@ -52,35 +52,37 @@ impl Generator {
     // should make this work for arbitary digits but this is fine for now
     // (even if it is 40 lines long lol)
     fn parse_print(&mut self) -> () {
-        self.generic("mov rax, [rsp]"); // load top of stack
-        self.generic("mov rbx, 100"); // get 100s
+        // load top of stack and calculate 1s, 10s, and, 100s
+        self.generic("mov rax, [rsp]");
+        self.generic("mov rbx, 100");
         self.generic("idiv rbx");
-        self.generic("mov rcx, rax"); // save hundreds to rcx
-        self.generic("mov rax, rdx"); // move remainder to rax
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rdx");
         self.generic("xor rdx, rdx");
-        self.generic("mov rbx, 10 "); // get 10s
+        self.generic("mov rbx, 10 ");
         self.generic("idiv rbx");
-        self.generic("mov rbx, rax"); // save 10s to rbx
-        self.generic("mov eax, edx"); // load remainder
-        self.generic("add eax, '0'"); // convert to ascii
-        self.generic("shl eax, 16"); // move remainder 2 bytes left
-        self.generic("mov ah, bl"); // load 10s 1 byte from the end
-        self.generic("mov al, cl"); // load 100s
-                                    // if not zero convert to ascii
+        self.generic("mov rbx, rax");
+        self.generic("mov eax, edx");
+
+        // convert digits to ascii if above 0
+        self.generic("add eax, '0'");
+        self.generic("shl eax, 16");
+        self.generic("mov ah, bl");
+        self.generic("mov al, cl");
         self.generic("cmp al, 0");
         self.generic(&format!("je DIG2ASCII{}", self.prints));
-        self.generic("add eax, '00'"); // convert to ascii
+        self.generic("add eax, '00'");
         self.generic(&format!("jmp ASCIIEX{}", self.prints));
-        // repeat for 10s
         self.generic(&format!("DIG2ASCII{}:", self.prints));
         self.level += 1;
         self.generic("cmp ah, 0");
         self.generic(&format!("je ASCIIEX{}", self.prints));
         self.generic("add ah, '0'");
         self.level -= 1;
-
         self.generic(&format!("ASCIIEX{}:", self.prints));
-        self.generic("mov [msg], eax"); // load eax into msg
+
+        // use write syscall
+        self.generic("mov [msg], eax");
         self.generic("mov rax, 1 ");
         self.generic("mov rdi, 1 ");
         self.generic("mov rsi, msg ");
