@@ -1,0 +1,9 @@
+sum = 0
+for num in [1, 2, 3]
+  sum = sum + num
+rof 
+prod = 1
+for num in [1, 1, 1, 2]
+  prod = prod * num
+rof
+exit prod + sum

@@ -52,35 +52,37 @@ impl Generator {
     // should make this work for arbitary digits but this is fine for now
     // (even if it is 40 lines long lol)
     fn parse_print(&mut self) -> () {
-        self.generic("mov rax, [rsp]"); // load top of stack
-        self.generic("mov rbx, 100"); // get 100s
+        // load top of stack and calculate 1s, 10s, and, 100s
+        self.generic("mov rax, [rsp]");
+        self.generic("mov rbx, 100");
         self.generic("idiv rbx");
-        self.generic("mov rcx, rax"); // save hundreds to rcx
-        self.generic("mov rax, rdx"); // move remainder to rax
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rdx");
         self.generic("xor rdx, rdx");
-        self.generic("mov rbx, 10 "); // get 10s
+        self.generic("mov rbx, 10 ");
         self.generic("idiv rbx");
-        self.generic("mov rbx, rax"); // save 10s to rbx
-        self.generic("mov eax, edx"); // load remainder
-        self.generic("add eax, '0'"); // convert to ascii
-        self.generic("shl eax, 16"); // move remainder 2 bytes left
-        self.generic("mov ah, bl"); // load 10s 1 byte from the end
-        self.generic("mov al, cl"); // load 100s
-                                    // if not zero convert to ascii
+        self.generic("mov rbx, rax");
+        self.generic("mov eax, edx");
+
+        // convert digits to ascii if above 0
+        self.generic("add eax, '0'");
+        self.generic("shl eax, 16");
+        self.generic("mov ah, bl");
+        self.generic("mov al, cl");
         self.generic("cmp al, 0");
         self.generic(&format!("je DIG2ASCII{}", self.prints));
-        self.generic("add eax, '00'"); // convert to ascii
+        self.generic("add eax, '00'");
         self.generic(&format!("jmp ASCIIEX{}", self.prints));
-        // repeat for 10s
         self.generic(&format!("DIG2ASCII{}:", self.prints));
         self.level += 1;
         self.generic("cmp ah, 0");
         self.generic(&format!("je ASCIIEX{}", self.prints));
         self.generic("add ah, '0'");
         self.level -= 1;
-
         self.generic(&format!("ASCIIEX{}:", self.prints));
-        self.generic("mov [msg], eax"); // load eax into msg
+
+        // use write syscall
+        self.generic("mov [msg], eax");
         self.generic("mov rax, 1 ");
         self.generic("mov rdi, 1 ");
         self.generic("mov rsi, msg ");
@@ -158,7 +160,6 @@ impl Generator {
         }
     }
 
-    // how to make arrays mutable -> needs more parsing!
     fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) {
         self.generate_expr(*expr);
         self.pop("rbx");
@@ -180,7 +181,7 @@ impl Generator {
         for expr in vector.into_iter() {
             self.generate_expr(*expr);
         }
-        self.generic("mov rax, 0x7F"); // 0x21 is !
+        self.generic("mov rax, 0x7F");
         self.push("rax");
     }
 
@@ -291,13 +292,53 @@ impl Generator {
         self.ifs += 1;
     }
 
-    fn generate_for(&mut self, var: String, node: ExpressionNode) -> () {
-        (var, node); //silence warnings
-        todo!()
+    // should be able to raise an error
+    // get rid of clone
+    // arrays are broken. when reassigned only a referance to the first value is given.
+    // need to add types decide how to implement array assigns -> pointer or copy -> maybe some
+    // nice syntax.
+    fn generate_for(&mut self, varname: String, node: ExpressionNode) -> () {
+        // init var, pointer and loop
+        self.generate_assign(format!("!LOOPARRAY{}", self.loops), node);
+        self.generate_assign(varname.clone(), ExpressionNode::Value("0x7F".to_string()));
+        self.generic("mov r8, 0");
+        self.generic(&format!("FOR{}:", self.loops));
+        self.level += 1;
+
+        // increment array pointer and move value to var
+        self.generic("mov rcx, r8");
+        self.generic("mov rax, 8");
+        self.generic("imul rcx");
+        self.generic("mov rcx, rax");
+        self.generic("mov rax, rsp");
+        self.generic("sub rax, rcx");
+        let variable_position = self
+            .variables
+            .get(&format!("!LOOPARRAY{}", self.loops))
+            .unwrap();
+        let pointer = format!(
+            "[rax + {}]",
+            (self.stack_pointer - variable_position - 1) * 8
+        );
+        let var = self.get_var_pointer(&varname);
+        self.generic(&format!("mov rax, {}", pointer));
+        self.generic(&format!("mov {}, rax", var));
+        self.generic("inc r8");
+        self.generic("xor rax, rax");
+        self.generic("xor rcx, rcx");
+
+        // are we at the end of the loop
+        self.generic(&format!("mov rax, {}", var));
+        self.generic("cmp rax, 0x7F");
+        self.generic(&format!("je ENDFOR{}", self.loops));
+        self.generic("xor rax, rax");
     }
 
     fn generate_end_for(&mut self) -> () {
-        todo!()
+        self.generic(&format!("jmp FOR{}", self.loops));
+        self.level -= 1;
+        self.generic(&format!("ENDFOR{}:", self.loops));
+        self.loops += 1;
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
