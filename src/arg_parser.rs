@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
-pub fn parse_args<'a>() -> HashMap<&'a str, String> {
-    //let args: Vec<String> = env::args().collect();
+pub fn parse_args() -> HashMap<&'static str, String> {
     let mut out: HashMap<&str, String> = HashMap::new();
     for arg in env::args().into_iter() {
         match arg.as_str() {
