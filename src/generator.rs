@@ -14,6 +14,7 @@ pub struct Generator {
     variables: HashMap<String, usize>,
 }
 
+// for functions save stack pointer before we go into function then reset after.
 impl Generator {
     pub fn new() -> Self {
         let asm = String::from(
@@ -138,8 +139,10 @@ impl Generator {
                 }
                 self.push("rax");
             }
-            ExpressionNode::Callable(name, expr) => {
-                self.generate_expr(*expr);
+            ExpressionNode::Callable(name, expr_vec) => {
+                for expr in expr_vec.into_iter() {
+                    self.generate_expr(*expr);
+                }
                 match name.as_str() {
                     "print(" => self.parse_print(),
                     "range(" => self.parse_range(),
@@ -342,6 +345,7 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
+        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
@@ -355,6 +359,8 @@ impl Generator {
                 StatementNode::AssignIndex(name, index_expr, assign_expr) => {
                     self.generate_assign_index(name, index_expr, assign_expr)
                 }
+                StatementNode::EndFunc => todo!(),
+                StatementNode::Func(_, _) => todo!(),
             };
         }
         self.assembly.to_owned()

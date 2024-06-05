@@ -35,3 +35,21 @@ fn test_lexer() -> Result<()> {
         .collect();
     Ok(())
 }
+
+#[test]
+fn test_func_lex() -> Result<()> {
+    let out = Lexer::lex("foo blah(a, bee) return a oof".to_string())?;
+    let target = vec![
+        TokenKind::Func,
+        TokenKind::Callable("blah(".to_string()),
+        TokenKind::VarName("a".to_string()),
+        TokenKind::Comma,
+        TokenKind::VarName("bee".to_string()),
+        TokenKind::CloseParen,
+        TokenKind::Return,
+        TokenKind::VarName("a".to_string()),
+        TokenKind::EndFunc,
+    ];
+    assert_eq!(&target, &out);
+    Ok(())
+}

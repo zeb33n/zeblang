@@ -19,6 +19,8 @@ pub enum StatementNode {
     EndIf,
     While(ExpressionNode),
     EndWhile,
+    Func(String, Vec<String>),
+    EndFunc,
 }
 
 #[derive(Debug, Serialize)]
@@ -26,7 +28,7 @@ pub enum ExpressionNode {
     Value(String),
     Var(String),
     Index(String, Box<ExpressionNode>),
-    Callable(String, Box<ExpressionNode>),
+    Callable(String, Vec<Box<ExpressionNode>>),
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
     Array(Vec<Box<ExpressionNode>>),
     PreAllocArray(usize),
@@ -69,6 +71,8 @@ impl Parser {
             TokenKind::EndWhile => Ok(StatementNode::EndWhile),
             TokenKind::If => self.parse_if(),
             TokenKind::EndIf => Ok(StatementNode::EndIf),
+            TokenKind::Func => self.parse_func_dec(),
+            TokenKind::EndFunc => Ok(StatementNode::EndFunc),
             _ => Err(syntax_error("not a valid line start", self.line)),
         }
     }
@@ -114,6 +118,25 @@ impl Parser {
             .next()
             .ok_or(syntax_error("expected expression", self.line))?;
         Ok(StatementNode::While(self.parse_expression(exp_start, 1)?))
+    }
+
+    fn parse_func_dec(&mut self) -> Result<StatementNode> {
+        if let Some(TokenKind::Callable(name)) = self.iterator.next() {
+            let mut args: Vec<String> = Vec::new();
+            loop {
+                match self
+                    .iterator
+                    .next()
+                    .ok_or(syntax_error("expected )", self.line))?
+                {
+                    TokenKind::VarName(vname) => args.push(vname),
+                    TokenKind::Comma => continue,
+                    TokenKind::CloseParen => return Ok(StatementNode::Func(name, args)),
+                    _ => return Err(syntax_error("unexpected token", self.line)),
+                };
+            }
+        }
+        return Err(syntax_error("expected function name", self.line));
     }
 
     fn parse_assign(&mut self, name: String) -> Result<StatementNode> {
@@ -203,17 +226,26 @@ impl Parser {
             TokenKind::OpenSquare => self.parse_array(),
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
             TokenKind::VarName(name) => self.parse_var(name),
-            TokenKind::Callable(name) => {
-                let next_token = self
-                    .iterator
-                    .next()
-                    .ok_or(syntax_error("expected expression", self.line))?;
-                Ok(ExpressionNode::Callable(
-                    name,
-                    Box::new(self.parse_expression(next_token, 1)?),
-                ))
-            }
+            TokenKind::Callable(name) => self.parse_callable(name),
             _ => Err(syntax_error("invalid expression", self.line)),
+        }
+    }
+
+    //bug in here somewhere
+    fn parse_callable(&mut self, name: String) -> Result<ExpressionNode> {
+        let mut out: Vec<Box<ExpressionNode>> = Vec::new();
+        loop {
+            dbg!(self.iterator.peek());
+            let next_token = self
+                .iterator
+                .next()
+                .ok_or(syntax_error("expected expression 1", self.line))?;
+            match next_token {
+                TokenKind::Comma => continue,
+                // close paren never arrives coz its part of an expression
+                TokenKind::CloseParen => break Ok(ExpressionNode::Callable(name, out)),
+                _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
+            }
         }
     }
 
@@ -266,6 +298,7 @@ impl Parser {
         }
     }
 
+    // close paren works liek this since it checks next space for an op
     fn get_infix_op(&mut self) -> Result<Option<String>> {
         match self.iterator.peek() {
             Some(token) => {
