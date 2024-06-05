@@ -235,7 +235,7 @@ impl Parser {
     fn parse_callable(&mut self, name: String) -> Result<ExpressionNode> {
         let mut out: Vec<Box<ExpressionNode>> = Vec::new();
         loop {
-            dbg!(self.iterator.peek());
+            // bug in the case of func(x) + y
             let next_token = match self.iterator.next() {
                 Some(TokenKind::CloseParen) | None => {
                     break Ok(ExpressionNode::Callable(name, out))
@@ -244,8 +244,6 @@ impl Parser {
             };
             match next_token {
                 TokenKind::Comma => continue,
-                // close paren never arrives coz its part of an expression
-                // TokenKind::CloseParen => break Ok(ExpressionNode::Callable(name, out)),
                 _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
             }
         }
