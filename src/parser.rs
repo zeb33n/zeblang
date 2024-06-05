@@ -236,14 +236,16 @@ impl Parser {
         let mut out: Vec<Box<ExpressionNode>> = Vec::new();
         loop {
             dbg!(self.iterator.peek());
-            let next_token = self
-                .iterator
-                .next()
-                .ok_or(syntax_error("expected expression 1", self.line))?;
+            let next_token = match self.iterator.next() {
+                Some(TokenKind::CloseParen) | None => {
+                    break Ok(ExpressionNode::Callable(name, out))
+                }
+                Some(token) => token,
+            };
             match next_token {
                 TokenKind::Comma => continue,
                 // close paren never arrives coz its part of an expression
-                TokenKind::CloseParen => break Ok(ExpressionNode::Callable(name, out)),
+                // TokenKind::CloseParen => break Ok(ExpressionNode::Callable(name, out)),
                 _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
             }
         }
