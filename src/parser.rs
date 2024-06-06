@@ -216,13 +216,7 @@ impl Parser {
 
     fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
         match token {
-            TokenKind::OpenParen => {
-                let next_token = self
-                    .iterator
-                    .next()
-                    .ok_or(syntax_error("expected expression", self.line))?;
-                self.parse_expression(next_token, 1)
-            }
+            TokenKind::OpenParen => self.parse_open_paren(),
             TokenKind::OpenSquare => self.parse_array(),
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
             TokenKind::VarName(name) => self.parse_var(name),
@@ -230,12 +224,18 @@ impl Parser {
             _ => Err(syntax_error("invalid expression", self.line)),
         }
     }
+    fn parse_open_paren(&mut self) -> Result<ExpressionNode> {
+        let expr = match self.iterator.next() {
+            Some(token) => self.parse_expression(token, 1),
+            None => Err(syntax_error("expected expression", self.line)),
+        };
+        self.iterator.next();
+        expr
+    }
 
-    //bug in here somewhere
     fn parse_callable(&mut self, name: String) -> Result<ExpressionNode> {
         let mut out: Vec<Box<ExpressionNode>> = Vec::new();
         loop {
-            // bug in the case of func(x) + y
             let next_token = match self.iterator.next() {
                 Some(TokenKind::CloseParen) | None => {
                     break Ok(ExpressionNode::Callable(name, out))
@@ -298,16 +298,12 @@ impl Parser {
         }
     }
 
-    // close paren works liek this since it checks next space for an op
     fn get_infix_op(&mut self) -> Result<Option<String>> {
         match self.iterator.peek() {
             Some(token) => {
                 let infix = match token {
                     TokenKind::Operator(infix) => Ok(Some(infix)),
-                    TokenKind::CloseParen => {
-                        self.iterator.next();
-                        Ok(None)
-                    }
+                    TokenKind::CloseParen => Ok(None),
                     TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
                     _ => Err(syntax_error("expected operator", self.line)),
                 }?;
