@@ -361,6 +361,7 @@ impl Generator {
                 }
                 StatementNode::EndFunc => todo!(),
                 StatementNode::Func(_, _) => todo!(),
+                StatementNode::Return(_) => todo!(),
             };
         }
         self.assembly.to_owned()

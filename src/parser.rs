@@ -10,6 +10,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub enum StatementNode {
+    Return(ExpressionNode),
     Exit(ExpressionNode),
     Assign(String, ExpressionNode),
     AssignIndex(String, ExpressionNode, ExpressionNode),
@@ -63,7 +64,8 @@ impl Parser {
 
     fn parse_statement(&mut self, current_token: TokenKind) -> Result<StatementNode> {
         match current_token {
-            TokenKind::Exit => Ok(self.parse_exit()?),
+            TokenKind::Exit => self.parse_exit(),
+            TokenKind::Return => self.parse_return(),
             TokenKind::VarName(name) => Ok(self.parse_assign(name)?),
             TokenKind::For => self.parse_for(),
             TokenKind::EndFor => Ok(StatementNode::EndFor),
@@ -172,6 +174,18 @@ impl Parser {
             }
             _ => Err(syntax_error("Invalid Token", self.line)),
         }
+    }
+
+    // how to not repeat myself here
+    fn parse_return(&mut self) -> Result<StatementNode> {
+        let err_msg = "expected expression";
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or_else(|| syntax_error(err_msg, self.line))?;
+        Ok(StatementNode::Return(
+            self.parse_expression(current_token, 1)?,
+        ))
     }
 
     fn parse_exit(&mut self) -> Result<StatementNode> {
@@ -303,8 +317,7 @@ impl Parser {
             Some(token) => {
                 let infix = match token {
                     TokenKind::Operator(infix) => Ok(Some(infix)),
-                    TokenKind::CloseParen => Ok(None),
-                    TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
+                    TokenKind::CloseParen | TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
                     _ => Err(syntax_error("expected operator", self.line)),
                 }?;
                 Ok(infix.cloned()) //do a better job here
