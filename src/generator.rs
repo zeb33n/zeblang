@@ -231,7 +231,7 @@ impl Generator {
         let variable_position = self.variables.get(&key).unwrap();
         format!(
             "[rsp + {}]",
-            (self.stack_pointer - variable_position - 1) * 8
+            (dbg!(self.stack_pointer) - variable_position - 1) * 8
         )
     }
 
@@ -366,7 +366,12 @@ impl Generator {
         for arg in args.into_iter() {
             self.variables
                 // do we need to do this somewhere else these will live on the stack for ever.
-                .insert(format!("{}{}", self.context, arg), self.stack_pointer);
+                // yes we need to do it when the function is called. we also need to keep track of
+                // argnames per func in a hasmap otherwise the compiler has no way of knowing what
+                // referances refer to what vars when declared.
+                .insert(format!("{}{}", self.context, arg), dbg!(self.stack_pointer));
+            // THIS IS
+            // WRONG
         }
         self.funcs.push(name);
     }
