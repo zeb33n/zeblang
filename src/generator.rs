@@ -6,15 +6,17 @@ use std::collections::HashMap;
 pub struct Generator {
     assembly: String,
     stack_pointer: usize,
+    sp_cache: usize,
     loops: usize,
     ifs: usize,
     equalitys: usize,
     prints: usize,
     level: usize,
+    context: String,
+    funcs: Vec<String>,
     variables: HashMap<String, usize>,
 }
 
-// for functions save stack pointer before we go into function then reset after.
 impl Generator {
     pub fn new() -> Self {
         let asm = String::from(
@@ -23,11 +25,14 @@ impl Generator {
         Self {
             assembly: asm,
             stack_pointer: 0,
+            sp_cache: 0,
             loops: 0,
             ifs: 0,
             equalitys: 0,
             prints: 0,
             level: 1,
+            context: "".to_string(),
+            funcs: Vec::new(),
             variables: HashMap::new(),
         }
     }
@@ -146,6 +151,9 @@ impl Generator {
                 match name.as_str() {
                     "print(" => self.parse_print(),
                     "range(" => self.parse_range(),
+                    name if self.funcs.contains(&name.to_string()) => {
+                        self.generate_call_func(name.to_string())
+                    }
                     _ => todo!("undeclared function"),
                 }
             }
@@ -155,8 +163,6 @@ impl Generator {
         }
     }
 
-    // how to we move the compilers stack pointer? perhaps impossible without using the heap?
-    // can make it so its not an expression and just hardcoded? Add end (=0x21) keyword.
     fn generate_prealloc_array(&mut self, size: usize) -> () {
         for _ in 0..size + 1 {
             self.push("0x7F")
@@ -171,7 +177,8 @@ impl Generator {
         self.generic("mov rcx, rax");
         self.generic("mov rax, rsp");
         self.generic("sub rax, rcx");
-        let variable_position = self.variables.get(varname).unwrap();
+        let key = format!("{}{}", self.context, varname);
+        let variable_position = self.variables.get(&key).unwrap();
         let index = format!(
             "[rax + {}]",
             (self.stack_pointer - variable_position - 1) * 8
@@ -220,14 +227,16 @@ impl Generator {
     }
 
     fn get_var_pointer(&mut self, name: &str) -> String {
-        let variable_position = self.variables.get(name).unwrap();
+        let key = format!("{}{}", self.context, name);
+        let variable_position = self.variables.get(&key).unwrap();
         format!(
             "[rsp + {}]",
             (self.stack_pointer - variable_position - 1) * 8
         )
     }
 
-    fn generate_assign(&mut self, name: String, node: ExpressionNode) -> () {
+    fn generate_assign(&mut self, mut name: String, node: ExpressionNode) -> () {
+        name = format!("{}{}", self.context, &name);
         if !self.variables.contains_key(&name) {
             self.variables.insert(name, self.stack_pointer);
             self.generate_expr(node);
@@ -241,7 +250,7 @@ impl Generator {
 
     fn generate_assign_index(
         &mut self,
-        name: String,
+        mut name: String,
         index_expr: ExpressionNode,
         assign_expr: ExpressionNode,
     ) -> () {
@@ -254,6 +263,7 @@ impl Generator {
         self.generic("mov rcx, rax");
         self.generic("mov rax, rsp");
         self.generic("sub rax, rcx");
+        name = format!("{}{}", self.context, &name);
         let variable_position = self.variables.get(&name).unwrap();
         let pointer = format!(
             "[rax + {}]",
@@ -344,6 +354,54 @@ impl Generator {
         self.loops += 1;
     }
 
+    // how do i just take a reference of name and put it on the stack i guess is clone is just
+    // doing the same thing but using the heap insted
+    fn generate_func(&mut self, name: String, args: Vec<String>) -> () {
+        self.context = name.clone();
+        self.sp_cache = self.stack_pointer;
+        self.generic(&format!("jmp END{}", &name));
+        self.generic(&name);
+        self.level += 1;
+        self.generic("mov r9, rsp"); // maybe we should push to stack instead ?
+        for arg in args.into_iter() {
+            self.variables
+                // do we need to do this somewhere else these will live on the stack for ever.
+                .insert(format!("{}{}", self.context, arg), self.stack_pointer);
+        }
+        self.funcs.push(name);
+    }
+
+    // reset stack pointer to the cached Value
+    // drop all of the function variables
+    // how do returns work with the stack? (might have to reset rsp to cache + 1)
+    // jump to end label
+    fn generate_end_func(&mut self) -> () {
+        self.pop("rax");
+        let diff = self.stack_pointer - self.sp_cache;
+        self.stack_pointer = self.sp_cache;
+        self.generic(&format!("add rsp, {}", diff * 8));
+        self.push("rax");
+        self.variables = self
+            .variables
+            .drain()
+            .filter(|(key, _)| !key.contains(&self.context))
+            .collect();
+        self.level -= 1;
+        self.context = "".to_string();
+        self.generic(&format!("END{}", self.context));
+    }
+
+    // push expression to the stack
+    fn generate_return(&mut self, node: ExpressionNode) -> () {
+        self.generate_expr(node);
+    }
+
+    // evaluate expressions and push to stack
+    // jump to function definition
+    fn generate_call_func(&mut self, name: String) -> () {
+        self.generic(&format!("jmp {}", name));
+    }
+
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
         dbg!(&program);
         for line in program.into_iter() {
@@ -359,9 +417,9 @@ impl Generator {
                 StatementNode::AssignIndex(name, index_expr, assign_expr) => {
                     self.generate_assign_index(name, index_expr, assign_expr)
                 }
-                StatementNode::EndFunc => todo!(),
-                StatementNode::Func(_, _) => todo!(),
-                StatementNode::Return(_) => todo!(),
+                StatementNode::EndFunc => self.generate_end_func(),
+                StatementNode::Func(name, args) => self.generate_func(name, args),
+                StatementNode::Return(expr) => self.generate_return(expr),
             };
         }
         self.assembly.to_owned()
