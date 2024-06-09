@@ -5,8 +5,8 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Generator {
     assembly: String,
-    stack_pointer: usize,
-    sp_cache: usize,
+    stack_pointer: i32,
+    sp_cache: i32,
     loops: usize,
     ifs: usize,
     equalitys: usize,
@@ -14,7 +14,7 @@ pub struct Generator {
     level: usize,
     context: String,
     funcs: HashMap<String, Vec<String>>,
-    variables: HashMap<String, usize>,
+    variables: HashMap<String, i32>,
 }
 
 impl Generator {
@@ -359,8 +359,9 @@ impl Generator {
     // how do i just take a reference of name and put it on the stack i guess is clone is just
     // doing the same thing but using the heap insted
     fn generate_func(&mut self, name: String, args: Vec<String>) -> () {
-        for arg in &args {
-            self.variables.insert(format!("{}{}", &name, arg), 0);
+        for (i, arg) in args.iter().enumerate() {
+            self.variables
+                .insert(format!("{}{}", &name, arg), -3 - i as i32);
         }
         self.context = name.clone();
         self.sp_cache = self.stack_pointer;
@@ -399,10 +400,10 @@ impl Generator {
     //assign return
     //return should be top of the stack
     fn generate_call_func(&mut self, name: String) -> () {
-        for (i, arg) in self.funcs.get(&name).unwrap().into_iter().enumerate() {
-            self.variables
-                .insert(format!("{}{}", &name, &arg), self.stack_pointer - i);
-        }
+        //for (i, arg) in self.funcs.get(&name).unwrap().into_iter().enumerate() {
+        //    self.variables
+        //        .insert(format!("{}{}", &name, &arg), self.stack_pointer - i - 32);
+        //}
         self.generic("mov rax, 0");
         self.push("rax");
         self.generic(&format!("jmp {}", name));
