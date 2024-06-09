@@ -149,7 +149,7 @@ impl Lexer {
                 }
                 b'(' => {
                     word.push(self.chars.next().unwrap() as char);
-                    break TokenKind::Callable(word);
+                    break TokenKind::Callable(word.replace("(", ""));
                 }
                 _ => break Self::lex_keyword(&word),
             }

@@ -13,7 +13,7 @@ pub struct Generator {
     prints: usize,
     level: usize,
     context: String,
-    funcs: Vec<String>,
+    funcs: HashMap<String, Vec<String>>,
     variables: HashMap<String, usize>,
 }
 
@@ -32,7 +32,7 @@ impl Generator {
             prints: 0,
             level: 1,
             context: "".to_string(),
-            funcs: Vec::new(),
+            funcs: HashMap::new(),
             variables: HashMap::new(),
         }
     }
@@ -149,9 +149,9 @@ impl Generator {
                     self.generate_expr(*expr);
                 }
                 match name.as_str() {
-                    "print(" => self.parse_print(),
-                    "range(" => self.parse_range(),
-                    name if self.funcs.contains(&name.to_string()) => {
+                    "print" => self.parse_print(),
+                    "range" => self.parse_range(),
+                    name if self.funcs.contains_key(&name.to_string()) => {
                         self.generate_call_func(name.to_string())
                     }
                     _ => todo!("undeclared function"),
@@ -228,6 +228,8 @@ impl Generator {
 
     fn get_var_pointer(&mut self, name: &str) -> String {
         let key = format!("{}{}", self.context, name);
+        dbg!(&self.variables);
+        dbg!(&key);
         let variable_position = self.variables.get(&key).unwrap();
         format!(
             "[rsp + {}]",
@@ -357,54 +359,54 @@ impl Generator {
     // how do i just take a reference of name and put it on the stack i guess is clone is just
     // doing the same thing but using the heap insted
     fn generate_func(&mut self, name: String, args: Vec<String>) -> () {
+        for arg in &args {
+            self.variables.insert(format!("{}{}", &name, arg), 0);
+        }
         self.context = name.clone();
         self.sp_cache = self.stack_pointer;
-        self.generic(&format!("jmp END{}", &name));
-        self.generic(&name);
+        self.generic(&format!("jmp SKIP{}", &name));
+        self.generic(&format!("{}:", &name));
         self.level += 1;
-        self.generic("mov r9, rsp"); // maybe we should push to stack instead ?
-        for arg in args.into_iter() {
-            self.variables
-                // do we need to do this somewhere else these will live on the stack for ever.
-                // yes we need to do it when the function is called. we also need to keep track of
-                // argnames per func in a hasmap otherwise the compiler has no way of knowing what
-                // referances refer to what vars when declared.
-                .insert(format!("{}{}", self.context, arg), dbg!(self.stack_pointer));
-            // THIS IS
-            // WRONG
-        }
-        self.funcs.push(name);
+        self.push("rsp");
+        self.push("rbp");
+        self.generic("mov rbp, rsp");
+        self.funcs.insert(name, args);
     }
 
-    // reset stack pointer to the cached Value
-    // drop all of the function variables
-    // how do returns work with the stack? (might have to reset rsp to cache + 1)
-    // jump to end label
     fn generate_end_func(&mut self) -> () {
-        self.pop("rax");
-        let diff = self.stack_pointer - self.sp_cache;
         self.stack_pointer = self.sp_cache;
-        self.generic(&format!("add rsp, {}", diff * 8));
-        self.push("rax");
+        self.generic("mov rsp, [rbp + 8]");
+        self.generic("mov rbp, [rbp]");
         self.variables = self
             .variables
             .drain()
             .filter(|(key, _)| !key.contains(&self.context))
             .collect();
+        self.generic(&format!("jmp END{}", self.context));
         self.level -= 1;
+        self.generic(&format!("SKIP{}:", self.context));
         self.context = "".to_string();
-        self.generic(&format!("END{}", self.context));
     }
 
-    // push expression to the stack
+    // mov return value to stack position
     fn generate_return(&mut self, node: ExpressionNode) -> () {
         self.generate_expr(node);
+        self.pop("rax");
+        self.generic("mov [rbp + 16], rax");
     }
 
-    // evaluate expressions and push to stack
-    // jump to function definition
+    //assign args
+    //assign return
+    //return should be top of the stack
     fn generate_call_func(&mut self, name: String) -> () {
+        for (i, arg) in self.funcs.get(&name).unwrap().into_iter().enumerate() {
+            self.variables
+                .insert(format!("{}{}", &name, &arg), self.stack_pointer - i);
+        }
+        self.generic("mov rax, 0");
+        self.push("rax");
         self.generic(&format!("jmp {}", name));
+        self.generic(&format!("END{}:", &name));
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
