@@ -1,4 +1,4 @@
-foo blah(a, b)
-  return a + b
+foo blah(a, b, c, d, e)
+  return a + b + c + d + e
 oof 
-exit blah(1, 2) + 1
+exit blah(1, 2, 3, 4, 5)

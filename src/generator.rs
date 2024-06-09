@@ -360,8 +360,10 @@ impl Generator {
     // doing the same thing but using the heap insted
     fn generate_func(&mut self, name: String, args: Vec<String>) -> () {
         for (i, arg) in args.iter().enumerate() {
-            self.variables
-                .insert(format!("{}{}", &name, arg), -3 - i as i32);
+            self.variables.insert(
+                format!("{}{}", &name, arg),
+                -(args.len() as i32 + 1) + i as i32,
+            );
         }
         self.context = name.clone();
         self.sp_cache = self.stack_pointer;
