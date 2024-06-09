@@ -391,21 +391,13 @@ impl Generator {
         self.context = "".to_string();
     }
 
-    // mov return value to stack position
     fn generate_return(&mut self, node: ExpressionNode) -> () {
         self.generate_expr(node);
         self.pop("rax");
         self.generic("mov [rbp + 16], rax");
     }
 
-    //assign args
-    //assign return
-    //return should be top of the stack
     fn generate_call_func(&mut self, name: String) -> () {
-        //for (i, arg) in self.funcs.get(&name).unwrap().into_iter().enumerate() {
-        //    self.variables
-        //        .insert(format!("{}{}", &name, &arg), self.stack_pointer - i - 32);
-        //}
         self.generic("mov rax, 0");
         self.push("rax");
         self.generic(&format!("jmp {}", name));
