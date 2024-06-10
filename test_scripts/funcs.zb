@@ -1,16 +1,5 @@
-a = 22
-foo blah(a, b, c, e)
-  hello = 5
-  sum = 0 
-  _ = 0
-  for num in [a, b, c, e]
-    _ = print(num)
-    sum = sum + num
-  rof
-  return sum + hello
+c = 22
+foo blah(a, b)
+  return a + b
 oof 
-_ = print(blah(1, 2, 3, 4))
-foo main()
-  return 1
-oof 
-exit main()
+exit blah(1, 2)

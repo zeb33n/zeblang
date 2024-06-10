@@ -364,7 +364,7 @@ impl Generator {
         for (i, arg) in args.iter().enumerate() {
             self.variables.insert(
                 format!("{}{}", &name, arg),
-                -(args.len() as i32 + 1) + i as i32,
+                self.stack_pointer + i as i32 - (args.len() as i32 + 1),
             );
         }
         self.context = name.clone();
