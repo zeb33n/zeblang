@@ -35,7 +35,7 @@ fn run_zeblang_file_json(addr: &str) -> String {
 #[test]
 fn test_funcs() {
     let out = run_zeblang_file("test_scripts/funcs.zb");
-    assert_eq!(21, out);
+    assert_eq!(18, out);
 }
 
 #[test]

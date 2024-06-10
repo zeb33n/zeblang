@@ -3,15 +3,7 @@ a = 40
 foo blah(alpha, beta)
   return alpha + beta
 oof 
-foo sum(a, b, c, d, e)
-  sum = 0 
-  for num in [a, b, c, d, e]
-    sum = sum + num
-  rof
-  return sum
+foo sum(a, b)
+  return a + b
 oof
-foo main()
-  _ = 1 + 1
-  return print(print(blah(1, 2)) * print(sum(1, 2, 3, 4, 5)))
-oof
-exit main()
+exit blah(1, 2) + sum(10, 2)

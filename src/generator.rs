@@ -13,7 +13,7 @@ pub struct Generator {
     prints: usize,
     level: usize,
     context: String,
-    funcs: HashMap<String, Vec<String>>,
+    funcs: HashMap<String, usize>,
     variables: HashMap<String, i32>,
 }
 
@@ -375,7 +375,7 @@ impl Generator {
         self.push("rsp");
         self.push("rbp");
         self.generic("mov rbp, rsp");
-        self.funcs.insert(name, args);
+        self.funcs.insert(name, args.len());
     }
 
     fn generate_end_func(&mut self) -> () {
@@ -393,6 +393,8 @@ impl Generator {
         self.context = "".to_string();
     }
 
+    //using 2 function calls in an expresion is broken since the args arent
+    //cleared off the stack
     fn generate_return(&mut self, node: ExpressionNode) -> () {
         self.generate_expr(node);
         self.pop("rax");
@@ -400,11 +402,15 @@ impl Generator {
     }
 
     fn generate_call_func(&mut self, name: String) -> () {
+        // default return value
         self.generic("mov rax, 0");
         self.push("rax");
-        self.generic("xor rax, rax");
         self.generic(&format!("jmp {}", name));
-        self.generic(&format!("END{}:", &name));
+        self.generic(&format!("END{}:", name));
+        self.pop("rax");
+        // clear args from stack
+        self.generic(&format!("add rsp, {}", self.funcs.get(&name).unwrap() * 8));
+        self.push("rax")
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
