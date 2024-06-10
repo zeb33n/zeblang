@@ -38,7 +38,7 @@ fn main() -> Result<()> {
         None => {
             let mut generator = Generator::new();
             let assembly = generator.generate(parse_tree?);
-            write_assembly_file(&filename, assembly)?;
+            write_assembly_file(&filename, assembly?)?;
         }
     }
     Ok(())
