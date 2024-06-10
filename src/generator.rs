@@ -402,6 +402,7 @@ impl Generator {
     fn generate_call_func(&mut self, name: String) -> () {
         self.generic("mov rax, 0");
         self.push("rax");
+        self.generic("xor rax, rax");
         self.generic(&format!("jmp {}", name));
         self.generic(&format!("END{}:", &name));
     }
