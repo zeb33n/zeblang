@@ -12,6 +12,6 @@ foo sum(a, b, c, d, e)
 oof
 foo main()
   _ = 1 + 1
-  return blah(1, 2) + sum(1, 2, 3, 4, 5)
+  return blah(1, 2) + sum(1, 2, 3 * 1, 4, 5)
 oof
 exit main()

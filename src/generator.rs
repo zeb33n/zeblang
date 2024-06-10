@@ -123,8 +123,7 @@ impl Generator {
                 self.push("rax");
             }
             ExpressionNode::Var(name) => {
-                dbg!("expr");
-                let var = self.get_var_pointer(dbg!(&name));
+                let var = self.get_var_pointer(&name);
                 self.generic(format!("mov rax, {}", var).as_str());
                 self.push("rax");
             }
@@ -229,8 +228,6 @@ impl Generator {
 
     fn get_var_pointer(&mut self, name: &str) -> String {
         let key = format!("{}{}", self.context, (name));
-        dbg!("get_var");
-        dbg!(&key);
         let variable_position = self.variables.get(&key).unwrap();
         format!(
             "[rsp + {}]",
@@ -246,8 +243,7 @@ impl Generator {
         } else {
             self.generate_expr(node);
             self.pop("rax");
-            dbg!("assign");
-            let var = self.get_var_pointer(dbg!(&name));
+            let var = self.get_var_pointer(&name);
             self.generic(format!("mov {}, rax", var).as_str())
         };
     }
@@ -417,10 +413,7 @@ impl Generator {
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
-                StatementNode::Assign(name, expr_node) => {
-                    dbg!("generate");
-                    self.generate_assign(dbg!(name), expr_node)
-                }
+                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node),
                 StatementNode::For(var, expr_node) => self.generate_for(var, expr_node),
                 StatementNode::EndFor => self.generate_end_for(),
                 StatementNode::While(expr_node) => self.generate_while(expr_node),
