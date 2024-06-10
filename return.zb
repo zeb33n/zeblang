@@ -1,10 +1,10 @@
 foo blah(a, b, c, e)
   hello = 5
-  _ = print(e)
+  _ = print(c)
   return a + b + c + e + hello
 oof 
 foo yam(exe)
   _ = print(exe)
 oof
 _ = yam(22)
-exit blah(1, 2, 1 + 2, 5)
+exit 1 + blah(1, 2, 1 + 2, 5)

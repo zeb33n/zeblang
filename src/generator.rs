@@ -123,7 +123,8 @@ impl Generator {
                 self.push("rax");
             }
             ExpressionNode::Var(name) => {
-                let var = self.get_var_pointer(&name);
+                dbg!("expr");
+                let var = self.get_var_pointer(dbg!(&name));
                 self.generic(format!("mov rax, {}", var).as_str());
                 self.push("rax");
             }
@@ -227,25 +228,26 @@ impl Generator {
     }
 
     fn get_var_pointer(&mut self, name: &str) -> String {
-        let key = format!("{}{}", self.context, name);
-        dbg!(&self.variables);
+        let key = format!("{}{}", self.context, (name));
+        dbg!("get_var");
         dbg!(&key);
         let variable_position = self.variables.get(&key).unwrap();
         format!(
             "[rsp + {}]",
-            (dbg!(self.stack_pointer) - variable_position - 1) * 8
+            ((self.stack_pointer) - variable_position - 1) * 8
         )
     }
 
-    fn generate_assign(&mut self, mut name: String, node: ExpressionNode) -> () {
-        name = format!("{}{}", self.context, &name);
-        if !self.variables.contains_key(&name) {
-            self.variables.insert(name, self.stack_pointer);
+    fn generate_assign(&mut self, name: String, node: ExpressionNode) -> () {
+        let key = format!("{}{}", self.context, &name);
+        if !self.variables.contains_key(&key) {
+            self.variables.insert(key, self.stack_pointer);
             self.generate_expr(node);
         } else {
             self.generate_expr(node);
             self.pop("rax");
-            let var = self.get_var_pointer(&name);
+            dbg!("assign");
+            let var = self.get_var_pointer(dbg!(&name));
             self.generic(format!("mov {}, rax", var).as_str())
         };
     }
@@ -329,7 +331,7 @@ impl Generator {
         self.generic("sub rax, rcx");
         let variable_position = self
             .variables
-            .get(&format!("!LOOPARRAY{}", self.loops))
+            .get(&format!("{}!LOOPARRAY{}", self.context, self.loops))
             .unwrap();
         let pointer = format!(
             "[rax + {}]",
@@ -405,11 +407,13 @@ impl Generator {
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
-        dbg!(&program);
         for line in program.into_iter() {
             match line {
                 StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
-                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node),
+                StatementNode::Assign(name, expr_node) => {
+                    dbg!("generate");
+                    self.generate_assign(dbg!(name), expr_node)
+                }
                 StatementNode::For(var, expr_node) => self.generate_for(var, expr_node),
                 StatementNode::EndFor => self.generate_end_for(),
                 StatementNode::While(expr_node) => self.generate_while(expr_node),

@@ -18,7 +18,7 @@ fn test_lexer() -> Result<()> {
         TokenKind::Operator("-".to_string()),
         TokenKind::VarName("z_A01".to_string()),
         TokenKind::Operator("+".to_string()),
-        TokenKind::Callable("foo(".to_string()),
+        TokenKind::Callable("foo".to_string()),
         TokenKind::Int("1".to_string()),
         TokenKind::Operator("+".to_string()),
         TokenKind::Int("1".to_string()),
@@ -41,7 +41,7 @@ fn test_func_lex() -> Result<()> {
     let out = Lexer::lex("foo blah(a, bee) return a oof".to_string())?;
     let target = vec![
         TokenKind::Func,
-        TokenKind::Callable("blah(".to_string()),
+        TokenKind::Callable("blah".to_string()),
         TokenKind::VarName("a".to_string()),
         TokenKind::Comma,
         TokenKind::VarName("bee".to_string()),
