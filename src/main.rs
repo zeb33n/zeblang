@@ -27,8 +27,10 @@ fn main() -> Result<()> {
     // collect the errors into a vec of errors
     let parse_tree: Result<Vec<StatementNode>> = code
         .into_iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(Lexer::lex)
         .enumerate()
-        .map(|(line_num, line)| Ok(parse(Lexer::lex(line)?, line_num + 1)?))
+        .map(|(line_num, line)| parse(line?, line_num + 1))
         .collect();
 
     match args.get("json") {
