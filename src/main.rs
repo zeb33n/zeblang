@@ -51,6 +51,8 @@ fn main() -> Result<()> {
             write_assembly_file(&filename, assembly?)?;
         }
         (_, _, None) => {
+            parse_errors.into_iter().for_each(|e| println!("{}", e));
+            Err(new_error("Syntax errors!"))?;
             todo!("code to print the errors");
         }
     }
