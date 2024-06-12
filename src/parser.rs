@@ -35,20 +35,16 @@ pub enum ExpressionNode {
     PreAllocArray(usize),
 }
 
-pub fn parse(line: Vec<TokenKind>, line_num: usize) -> Result<StatementNode> {
-    let iterator = line.into_iter();
-    Parser::parse(iterator, line_num)
-}
-
-struct Parser {
+pub struct Parser {
     iterator: Peekable<IntoIter<TokenKind>>,
     line: usize,
 }
 
 impl Parser {
-    fn parse(iterator: IntoIter<TokenKind>, line_num: usize) -> Result<StatementNode> {
+    pub fn parse(line: Vec<TokenKind>, line_num: usize) -> Result<StatementNode> {
+        let iterator = line.into_iter().peekable();
         Self {
-            iterator: iterator.peekable(),
+            iterator: iterator,
             line: line_num,
         }
         .do_parsing()

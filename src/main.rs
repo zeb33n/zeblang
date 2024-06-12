@@ -2,13 +2,13 @@ use std::io::Result;
 
 mod tokenizer;
 use error::new_error;
-use tokenizer::Lexer;
+use tokenizer::{Lexer, TokenKind};
 
 mod local_client;
 use local_client::{read_file, write_assembly_file, write_json};
 
 mod parser;
-use parser::{parse, StatementNode};
+use parser::{Parser, StatementNode};
 
 mod error;
 
@@ -25,22 +25,36 @@ fn main() -> Result<()> {
 
     let code = read_file(filename);
     // collect the errors into a vec of errors
-    let parse_tree: Result<Vec<StatementNode>> = code
+    let token_vecs = code
         .into_iter()
         .filter(|line| !line.trim().is_empty())
         .map(Lexer::lex)
-        .enumerate()
-        .map(|(line_num, line)| parse(line?, line_num + 1))
-        .collect();
+        .collect::<Result<Vec<Vec<TokenKind>>>>()?;
 
-    match args.get("json") {
-        Some(_) => write_json(filename, parse_tree)?,
-        None => {
-            let mut generator = Generator::new();
-            let assembly = generator.generate(parse_tree?);
-            write_assembly_file(&filename, assembly?)?;
+    let mut parse_tree: Vec<StatementNode> = Vec::with_capacity(token_vecs.len());
+    let mut parse_errors: Vec<String> = Vec::with_capacity(token_vecs.len());
+    for (i, line) in token_vecs.into_iter().enumerate() {
+        match Parser::parse(line, i + 1) {
+            Ok(statement) => parse_tree.push(statement),
+            Err(e) => parse_errors.push(e.to_string()),
         }
     }
+
+    match (
+        parse_errors.as_slice(),
+        parse_tree.as_slice(),
+        args.get("json"),
+    ) {
+        (_, _, Some(_)) => write_json(filename, parse_tree)?,
+        ([], _, None) => {
+            let assembly = Generator::generate(parse_tree);
+            write_assembly_file(&filename, assembly?)?;
+        }
+        (_, _, None) => {
+            todo!("code to print the errors");
+        }
+    }
+
     Ok(())
 }
 
