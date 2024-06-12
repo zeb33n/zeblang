@@ -1,17 +1,22 @@
+use crate::error::new_error;
 use crate::parser::{ExpressionNode, StatementNode};
 
 use std::collections::HashMap;
+use std::io::Result;
 
 #[derive(Debug)]
 pub struct Generator {
     assembly: String,
-    stack_pointer: usize,
+    stack_pointer: i32,
+    sp_cache: i32,
     loops: usize,
     ifs: usize,
     equalitys: usize,
     prints: usize,
     level: usize,
-    variables: HashMap<String, usize>,
+    context: String,
+    funcs: HashMap<String, usize>,
+    variables: HashMap<String, i32>,
 }
 
 impl Generator {
@@ -22,11 +27,14 @@ impl Generator {
         Self {
             assembly: asm,
             stack_pointer: 0,
+            sp_cache: 0,
             loops: 0,
             ifs: 0,
             equalitys: 0,
             prints: 0,
             level: 1,
+            context: "".to_string(),
+            funcs: HashMap::new(),
             variables: HashMap::new(),
         }
     }
@@ -110,20 +118,20 @@ impl Generator {
         self.loops += 1;
     }
 
-    fn generate_expr(&mut self, expr: ExpressionNode) -> () {
+    fn generate_expr(&mut self, expr: ExpressionNode) -> Result<()> {
         match expr {
             ExpressionNode::Value(value) => {
                 self.generic(format!("mov rax, {}", value).as_str());
                 self.push("rax");
             }
             ExpressionNode::Var(name) => {
-                let var = self.get_var_pointer(&name);
+                let var = self.get_var_pointer(&name)?;
                 self.generic(format!("mov rax, {}", var).as_str());
                 self.push("rax");
             }
             ExpressionNode::Infix(expr_1, op, expr_2) => {
-                self.generate_expr(*expr_1);
-                self.generate_expr(*expr_2);
+                self.generate_expr(*expr_1)?;
+                self.generate_expr(*expr_2)?;
                 self.pop("rbx");
                 self.pop("rax");
                 match op.as_str() {
@@ -138,51 +146,61 @@ impl Generator {
                 }
                 self.push("rax");
             }
-            ExpressionNode::Callable(name, expr) => {
-                self.generate_expr(*expr);
+            ExpressionNode::Callable(name, expr_vec) => {
+                for expr in expr_vec.into_iter() {
+                    self.generate_expr(*expr)?;
+                }
                 match name.as_str() {
-                    "print(" => self.parse_print(),
-                    "range(" => self.parse_range(),
+                    "print" => self.parse_print(),
+                    "range" => self.parse_range(),
+                    name if self.funcs.contains_key(&name.to_string()) => {
+                        self.generate_call_func(name.to_string())?
+                    }
                     _ => todo!("undeclared function"),
                 }
             }
-            ExpressionNode::Array(vector) => self.generate_array(vector),
+            ExpressionNode::Array(vector) => self.generate_array(vector)?,
             ExpressionNode::PreAllocArray(size) => self.generate_prealloc_array(size),
-            ExpressionNode::Index(varname, expr) => self.generate_index(&varname, expr),
+            ExpressionNode::Index(varname, expr) => self.generate_index(&varname, expr)?,
         }
+        Ok(())
     }
 
-    // how to we move the compilers stack pointer? perhaps impossible without using the heap?
-    // can make it so its not an expression and just hardcoded? Add end (=0x21) keyword.
     fn generate_prealloc_array(&mut self, size: usize) -> () {
         for _ in 0..size + 1 {
             self.push("0x7F")
         }
     }
 
-    fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) {
-        self.generate_expr(*expr);
+    fn generate_index(&mut self, varname: &str, expr: Box<ExpressionNode>) -> Result<()> {
+        self.generate_expr(*expr)?;
         self.pop("rbx");
         self.generic("mov rax, 8");
         self.generic("imul rbx");
         self.generic("mov rcx, rax");
         self.generic("mov rax, rsp");
         self.generic("sub rax, rcx");
-        let variable_position = self.variables.get(varname).unwrap();
+        let key = format!("{}{}", self.context, varname);
+        let variable_position = self.variables.get(&key).ok_or(new_error(&format!(
+            "variable {} not found in this scope",
+            &varname
+        )))?;
         let index = format!(
             "[rax + {}]",
             (self.stack_pointer - variable_position - 1) * 8
         );
         self.generic(format!("mov rax, {}", index).as_str());
         self.push("rax");
+        Ok(())
     }
 
-    fn generate_array(&mut self, vector: Vec<Box<ExpressionNode>>) -> () {
+    fn generate_array(&mut self, vector: Vec<Box<ExpressionNode>>) -> Result<()> {
         for expr in vector.into_iter() {
-            self.generate_expr(*expr);
+            self.generate_expr(*expr)?;
         }
         self.generic("mov rax, 0x7F");
         self.push("rax");
+        Ok(())
     }
 
     fn generate_modulo(&mut self) -> () {
@@ -209,31 +227,38 @@ impl Generator {
         self.generic("xor rax, 1");
     }
 
-    fn generate_exit(&mut self, node: ExpressionNode) -> () {
-        self.generate_expr(node);
+    fn generate_exit(&mut self, node: ExpressionNode) -> Result<()> {
+        self.generate_expr(node)?;
         self.generic("mov rax, 60");
         self.pop("rdi");
         self.generic("syscall");
+        Ok(())
     }
 
-    fn get_var_pointer(&mut self, name: &str) -> String {
-        let variable_position = self.variables.get(name).unwrap();
-        format!(
+    fn get_var_pointer(&mut self, name: &str) -> Result<String> {
+        let key = format!("{}{}", self.context, (name));
+        let variable_position = self.variables.get(&key).ok_or(new_error(&format!(
+            "variable {} not found in this scope",
+            name
+        )))?;
+        Ok(format!(
             "[rsp + {}]",
-            (self.stack_pointer - variable_position - 1) * 8
-        )
+            ((self.stack_pointer) - variable_position - 1) * 8
+        ))
     }
 
-    fn generate_assign(&mut self, name: String, node: ExpressionNode) -> () {
-        if !self.variables.contains_key(&name) {
-            self.variables.insert(name, self.stack_pointer);
-            self.generate_expr(node);
+    fn generate_assign(&mut self, name: String, node: ExpressionNode) -> Result<()> {
+        let key = format!("{}{}", self.context, &name);
+        if !self.variables.contains_key(&key) {
+            self.variables.insert(key, self.stack_pointer);
+            self.generate_expr(node)?;
         } else {
-            self.generate_expr(node);
+            self.generate_expr(node)?;
             self.pop("rax");
-            let var = self.get_var_pointer(&name);
+            let var = self.get_var_pointer(&name)?;
             self.generic(format!("mov {}, rax", var).as_str())
         };
+        Ok(())
     }
 
     fn generate_assign_index(
@@ -241,9 +266,9 @@ impl Generator {
         name: String,
         index_expr: ExpressionNode,
         assign_expr: ExpressionNode,
-    ) -> () {
-        self.generate_expr(assign_expr);
-        self.generate_expr(index_expr);
+    ) -> Result<()> {
+        self.generate_expr(assign_expr)?;
+        self.generate_expr(index_expr)?;
         self.pop("rcx");
         self.pop("rbx");
         self.generic("mov rax, 8");
@@ -251,18 +276,23 @@ impl Generator {
         self.generic("mov rcx, rax");
         self.generic("mov rax, rsp");
         self.generic("sub rax, rcx");
-        let variable_position = self.variables.get(&name).unwrap();
+        let key = format!("{}{}", self.context, &name);
+        let variable_position = self.variables.get(&key).ok_or(new_error(&format!(
+            "variable {} not found in this scope",
+            name
+        )))?;
         let pointer = format!(
             "[rax + {}]",
             (self.stack_pointer - variable_position - 1) * 8
         );
-        self.generic(&format!("mov {}, rbx", pointer))
+        self.generic(&format!("mov {}, rbx", pointer));
+        Ok(())
     }
 
-    fn generate_while(&mut self, node: ExpressionNode) -> () {
+    fn generate_while(&mut self, node: ExpressionNode) -> Result<()> {
         self.generic(format!("wexp{}:", &self.loops).as_str());
         self.level += 1;
-        self.generate_expr(node);
+        self.generate_expr(node)?;
         self.pop("rax");
         self.generic("mov rbx, 0");
         self.generic("cmp rax, rbx");
@@ -271,6 +301,7 @@ impl Generator {
         self.level -= 1;
         self.generic(format!("loop{}:", &self.loops).as_str());
         self.level += 1;
+        Ok(())
     }
 
     fn generate_end_while(&mut self) -> () {
@@ -280,11 +311,12 @@ impl Generator {
         self.loops += 1;
     }
 
-    fn generate_if(&mut self, node: ExpressionNode) -> () {
-        self.generate_expr(node);
+    fn generate_if(&mut self, node: ExpressionNode) -> Result<()> {
+        self.generate_expr(node)?;
         self.pop("rax");
         self.generic("cmp rax, 0");
         self.generic(format!("je endif{}", self.ifs).as_str());
+        Ok(())
     }
 
     fn generate_end_if(&mut self) -> () {
@@ -297,10 +329,10 @@ impl Generator {
     // arrays are broken. when reassigned only a referance to the first value is given.
     // need to add types decide how to implement array assigns -> pointer or copy -> maybe some
     // nice syntax.
-    fn generate_for(&mut self, varname: String, node: ExpressionNode) -> () {
+    fn generate_for(&mut self, varname: String, node: ExpressionNode) -> Result<()> {
         // init var, pointer and loop
-        self.generate_assign(format!("!LOOPARRAY{}", self.loops), node);
-        self.generate_assign(varname.clone(), ExpressionNode::Value("0x7F".to_string()));
+        self.generate_assign(format!("!LOOPARRAY{}", self.loops), node)?;
+        self.generate_assign(varname.clone(), ExpressionNode::Value("0x7F".to_string()))?;
         self.generic("mov r8, 0");
         self.generic(&format!("FOR{}:", self.loops));
         self.level += 1;
@@ -314,13 +346,13 @@ impl Generator {
         self.generic("sub rax, rcx");
         let variable_position = self
             .variables
-            .get(&format!("!LOOPARRAY{}", self.loops))
+            .get(&format!("{}!LOOPARRAY{}", self.context, self.loops))
             .unwrap();
         let pointer = format!(
             "[rax + {}]",
             (self.stack_pointer - variable_position - 1) * 8
         );
-        let var = self.get_var_pointer(&varname);
+        let var = self.get_var_pointer(&varname)?;
         self.generic(&format!("mov rax, {}", pointer));
         self.generic(&format!("mov {}, rax", var));
         self.generic("inc r8");
@@ -332,6 +364,7 @@ impl Generator {
         self.generic("cmp rax, 0x7F");
         self.generic(&format!("je ENDFOR{}", self.loops));
         self.generic("xor rax, rax");
+        Ok(())
     }
 
     fn generate_end_for(&mut self) -> () {
@@ -341,22 +374,88 @@ impl Generator {
         self.loops += 1;
     }
 
-    pub fn generate(&mut self, program: Vec<StatementNode>) -> String {
+    // how do i just take a reference of name and put it on the stack i guess is clone is just
+    // doing the same thing but using the heap insted
+    fn generate_func(&mut self, name: String, args: Vec<String>) -> () {
+        for (i, arg) in args.iter().enumerate() {
+            self.variables.insert(
+                format!("{}{}", &name, arg),
+                self.stack_pointer + i as i32 - (args.len() as i32 + 1),
+            );
+        }
+        self.context = name.clone();
+        self.sp_cache = self.stack_pointer;
+        self.generic(&format!("jmp SKIP{}", &name));
+        self.generic(&format!("{}:", &name));
+        self.level += 1;
+        self.push("rsp");
+        self.push("rbp");
+        self.generic("mov rbp, rsp");
+        self.funcs.insert(name, args.len());
+    }
+
+    fn generate_end_func(&mut self) -> () {
+        self.stack_pointer = self.sp_cache;
+        self.generic("mov rsp, [rbp + 8]");
+        self.generic("mov rbp, [rbp]");
+        self.variables = self
+            .variables
+            .drain()
+            .filter(|(key, _)| !key.contains(&self.context))
+            .collect();
+        self.generic(&format!("jmp END{}", self.context));
+        self.level -= 1;
+        self.generic(&format!("SKIP{}:", self.context));
+        self.context = "".to_string();
+    }
+
+    //using 2 function calls in an expresion is broken since the args arent
+    //cleared off the stack
+    fn generate_return(&mut self, node: ExpressionNode) -> Result<()> {
+        self.generate_expr(node)?;
+        self.pop("rax");
+        self.generic("mov [rbp + 16], rax");
+        Ok(())
+    }
+
+    fn generate_call_func(&mut self, name: String) -> Result<()> {
+        // default return value
+        self.generic("mov rax, 0");
+        self.push("rax");
+        self.generic(&format!("jmp {}", name));
+        self.generic(&format!("END{}:", name));
+        self.pop("rax");
+        // clear args from stack
+        self.generic(&format!(
+            "add rsp, {}",
+            self.funcs
+                .get(&name)
+                .ok_or(new_error(&format!("function {} undefined", name)))?
+                * 8
+        ));
+        self.push("rax");
+        Ok(())
+    }
+
+    pub fn generate(&mut self, program: Vec<StatementNode>) -> Result<String> {
         for line in program.into_iter() {
             match line {
-                StatementNode::Exit(expr_node) => self.generate_exit(expr_node),
-                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node),
-                StatementNode::For(var, expr_node) => self.generate_for(var, expr_node),
+                StatementNode::Exit(expr_node) => self.generate_exit(expr_node)?,
+                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node)?,
+                StatementNode::For(var, expr_node) => self.generate_for(var, expr_node)?,
                 StatementNode::EndFor => self.generate_end_for(),
-                StatementNode::While(expr_node) => self.generate_while(expr_node),
+                StatementNode::While(expr_node) => self.generate_while(expr_node)?,
                 StatementNode::EndWhile => self.generate_end_while(),
-                StatementNode::If(expr_node) => self.generate_if(expr_node),
+                StatementNode::If(expr_node) => self.generate_if(expr_node)?,
                 StatementNode::EndIf => self.generate_end_if(),
                 StatementNode::AssignIndex(name, index_expr, assign_expr) => {
-                    self.generate_assign_index(name, index_expr, assign_expr)
+                    self.generate_assign_index(name, index_expr, assign_expr)?
                 }
+                StatementNode::EndFunc => self.generate_end_func(),
+                StatementNode::Func(name, args) => self.generate_func(name, args),
+                StatementNode::Return(expr) => self.generate_return(expr)?,
             };
         }
-        self.assembly.to_owned()
+        Ok(self.assembly.to_owned())
     }
 }

@@ -6,6 +6,9 @@ use crate::error::new_error;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
+    Func,
+    EndFunc,
+    Return,
     Size,
     If,
     EndIf,
@@ -146,7 +149,7 @@ impl Lexer {
                 }
                 b'(' => {
                     word.push(self.chars.next().unwrap() as char);
-                    break TokenKind::Callable(word);
+                    break TokenKind::Callable(word.replace("(", ""));
                 }
                 _ => break Self::lex_keyword(&word),
             }
@@ -155,6 +158,9 @@ impl Lexer {
 
     fn lex_keyword(word: &str) -> TokenKind {
         match word {
+            "foo" => TokenKind::Func,
+            "oof" => TokenKind::EndFunc,
+            "return" => TokenKind::Return,
             "size" => TokenKind::Size,
             "if" => TokenKind::If,
             "fi" => TokenKind::EndIf,
