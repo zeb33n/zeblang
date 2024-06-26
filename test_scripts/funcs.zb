@@ -1,0 +1,17 @@
+c = 32
+a = 40
+foo blah(alpha, beta)
+  return alpha + beta
+oof 
+foo sum(a, b, c, d, e)
+  sum = 0 
+  for num in [a, b, c, d, e]
+    sum = sum + num
+  rof
+  return sum
+oof
+foo main()
+  _ = 1 + 1
+  return blah(1, 2) + sum(1, 2, 3 * 1, 4, 5)
+oof
+exit main()

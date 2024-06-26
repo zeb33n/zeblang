@@ -10,6 +10,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub enum StatementNode {
+    Return(ExpressionNode),
     Exit(ExpressionNode),
     Assign(String, ExpressionNode),
     AssignIndex(String, ExpressionNode, ExpressionNode),
@@ -19,6 +20,8 @@ pub enum StatementNode {
     EndIf,
     While(ExpressionNode),
     EndWhile,
+    Func(String, Vec<String>),
+    EndFunc,
 }
 
 #[derive(Debug, Serialize)]
@@ -26,7 +29,7 @@ pub enum ExpressionNode {
     Value(String),
     Var(String),
     Index(String, Box<ExpressionNode>),
-    Callable(String, Box<ExpressionNode>),
+    Callable(String, Vec<Box<ExpressionNode>>),
     Infix(Box<ExpressionNode>, String, Box<ExpressionNode>),
     Array(Vec<Box<ExpressionNode>>),
     PreAllocArray(usize),
@@ -61,7 +64,8 @@ impl Parser {
 
     fn parse_statement(&mut self, current_token: TokenKind) -> Result<StatementNode> {
         match current_token {
-            TokenKind::Exit => Ok(self.parse_exit()?),
+            TokenKind::Exit => self.parse_exit(),
+            TokenKind::Return => self.parse_return(),
             TokenKind::VarName(name) => Ok(self.parse_assign(name)?),
             TokenKind::For => self.parse_for(),
             TokenKind::EndFor => Ok(StatementNode::EndFor),
@@ -69,6 +73,8 @@ impl Parser {
             TokenKind::EndWhile => Ok(StatementNode::EndWhile),
             TokenKind::If => self.parse_if(),
             TokenKind::EndIf => Ok(StatementNode::EndIf),
+            TokenKind::Func => self.parse_func_dec(),
+            TokenKind::EndFunc => Ok(StatementNode::EndFunc),
             _ => Err(syntax_error("not a valid line start", self.line)),
         }
     }
@@ -116,6 +122,25 @@ impl Parser {
         Ok(StatementNode::While(self.parse_expression(exp_start, 1)?))
     }
 
+    fn parse_func_dec(&mut self) -> Result<StatementNode> {
+        if let Some(TokenKind::Callable(name)) = self.iterator.next() {
+            let mut args: Vec<String> = Vec::new();
+            loop {
+                match self
+                    .iterator
+                    .next()
+                    .ok_or(syntax_error("expected )", self.line))?
+                {
+                    TokenKind::VarName(vname) => args.push(vname),
+                    TokenKind::Comma => continue,
+                    TokenKind::CloseParen => return Ok(StatementNode::Func(name, args)),
+                    _ => return Err(syntax_error("unexpected token", self.line)),
+                };
+            }
+        }
+        return Err(syntax_error("expected function name", self.line));
+    }
+
     fn parse_assign(&mut self, name: String) -> Result<StatementNode> {
         let current_token = self
             .iterator
@@ -149,6 +174,18 @@ impl Parser {
             }
             _ => Err(syntax_error("Invalid Token", self.line)),
         }
+    }
+
+    // how to not repeat myself here
+    fn parse_return(&mut self) -> Result<StatementNode> {
+        let err_msg = "expected expression";
+        let current_token = self
+            .iterator
+            .next()
+            .ok_or_else(|| syntax_error(err_msg, self.line))?;
+        Ok(StatementNode::Return(
+            self.parse_expression(current_token, 1)?,
+        ))
     }
 
     fn parse_exit(&mut self) -> Result<StatementNode> {
@@ -193,27 +230,36 @@ impl Parser {
 
     fn parse_expression_token(&mut self, token: TokenKind) -> Result<ExpressionNode> {
         match token {
-            TokenKind::OpenParen => {
-                let next_token = self
-                    .iterator
-                    .next()
-                    .ok_or(syntax_error("expected expression", self.line))?;
-                self.parse_expression(next_token, 1)
-            }
+            TokenKind::OpenParen => self.parse_open_paren(),
             TokenKind::OpenSquare => self.parse_array(),
             TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
             TokenKind::VarName(name) => self.parse_var(name),
-            TokenKind::Callable(name) => {
-                let next_token = self
-                    .iterator
-                    .next()
-                    .ok_or(syntax_error("expected expression", self.line))?;
-                Ok(ExpressionNode::Callable(
-                    name,
-                    Box::new(self.parse_expression(next_token, 1)?),
-                ))
-            }
+            TokenKind::Callable(name) => self.parse_callable(name),
             _ => Err(syntax_error("invalid expression", self.line)),
+        }
+    }
+    fn parse_open_paren(&mut self) -> Result<ExpressionNode> {
+        let expr = match self.iterator.next() {
+            Some(token) => self.parse_expression(token, 1),
+            None => Err(syntax_error("expected expression", self.line)),
+        };
+        self.iterator.next();
+        expr
+    }
+
+    fn parse_callable(&mut self, name: String) -> Result<ExpressionNode> {
+        let mut out: Vec<Box<ExpressionNode>> = Vec::new();
+        loop {
+            let next_token = match self.iterator.next() {
+                Some(TokenKind::CloseParen) | None => {
+                    break Ok(ExpressionNode::Callable(name, out))
+                }
+                Some(token) => token,
+            };
+            match next_token {
+                TokenKind::Comma => continue,
+                _ => out.push(Box::new(self.parse_expression(next_token, 1)?)),
+            }
         }
     }
 
@@ -271,11 +317,7 @@ impl Parser {
             Some(token) => {
                 let infix = match token {
                     TokenKind::Operator(infix) => Ok(Some(infix)),
-                    TokenKind::CloseParen => {
-                        self.iterator.next();
-                        Ok(None)
-                    }
-                    TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
+                    TokenKind::CloseParen | TokenKind::CloseSquare | TokenKind::Comma => Ok(None),
                     _ => Err(syntax_error("expected operator", self.line)),
                 }?;
                 Ok(infix.cloned()) //do a better job here
