@@ -20,7 +20,7 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new() -> Self {
+    pub fn generate(program: Vec<StatementNode>) -> Result<String> {
         let asm = String::from(
             "section .data\n    msg: db 0, 0, 0, 0, 10\nsection .text\n    global _start\n_start:\n",
         );
@@ -37,6 +37,29 @@ impl Generator {
             funcs: HashMap::new(),
             variables: HashMap::new(),
         }
+        .do_generate(program)
+    }
+
+    fn do_generate(&mut self, program: Vec<StatementNode>) -> Result<String> {
+        for line in program.into_iter() {
+            match line {
+                StatementNode::Exit(expr_node) => self.generate_exit(expr_node)?,
+                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node)?,
+                StatementNode::For(var, expr_node) => self.generate_for(var, expr_node)?,
+                StatementNode::EndFor => self.generate_end_for(),
+                StatementNode::While(expr_node) => self.generate_while(expr_node)?,
+                StatementNode::EndWhile => self.generate_end_while(),
+                StatementNode::If(expr_node) => self.generate_if(expr_node)?,
+                StatementNode::EndIf => self.generate_end_if(),
+                StatementNode::AssignIndex(name, index_expr, assign_expr) => {
+                    self.generate_assign_index(name, index_expr, assign_expr)?
+                }
+                StatementNode::EndFunc => self.generate_end_func(),
+                StatementNode::Func(name, args) => self.generate_func(name, args),
+                StatementNode::Return(expr) => self.generate_return(expr)?,
+            };
+        }
+        Ok(self.assembly.to_owned())
     }
 
     fn indent(level: usize) -> String {
@@ -435,27 +458,5 @@ impl Generator {
         ));
         self.push("rax");
         Ok(())
-    }
-
-    pub fn generate(&mut self, program: Vec<StatementNode>) -> Result<String> {
-        for line in program.into_iter() {
-            match line {
-                StatementNode::Exit(expr_node) => self.generate_exit(expr_node)?,
-                StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node)?,
-                StatementNode::For(var, expr_node) => self.generate_for(var, expr_node)?,
-                StatementNode::EndFor => self.generate_end_for(),
-                StatementNode::While(expr_node) => self.generate_while(expr_node)?,
-                StatementNode::EndWhile => self.generate_end_while(),
-                StatementNode::If(expr_node) => self.generate_if(expr_node)?,
-                StatementNode::EndIf => self.generate_end_if(),
-                StatementNode::AssignIndex(name, index_expr, assign_expr) => {
-                    self.generate_assign_index(name, index_expr, assign_expr)?
-                }
-                StatementNode::EndFunc => self.generate_end_func(),
-                StatementNode::Func(name, args) => self.generate_func(name, args),
-                StatementNode::Return(expr) => self.generate_return(expr)?,
-            };
-        }
-        Ok(self.assembly.to_owned())
     }
 }
