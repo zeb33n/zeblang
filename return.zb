@@ -1,14 +1,3 @@
-foo sum(a, b, c, d, e)
-  out = 0
-  for num in [a, b, c, d, e]
-    out = 
-  rof
-  return out
-oof 
-
-foo main()
-  jelly 1
-  _ = print(sum(1, 2, 3, 4, 5))
-oof
-
-exit main()
+x = [1, 2, 3, 4, * 777 yt
+= 21
+exit x[4]

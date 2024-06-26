@@ -31,12 +31,13 @@ fn main() -> Result<()> {
         .map(Lexer::lex)
         .collect::<Result<Vec<Vec<TokenKind>>>>()?;
 
+    // serialise the outputs and save in a jsonifiy vec
     let mut parse_tree: Vec<StatementNode> = Vec::with_capacity(token_vecs.len());
     let mut parse_errors: Vec<String> = Vec::with_capacity(token_vecs.len());
     for (i, line) in token_vecs.into_iter().enumerate() {
         match Parser::parse(line, i + 1) {
             Ok(statement) => parse_tree.push(statement),
-            Err(e) => parse_errors.push(e.to_string()),
+            Err(e) => parse_errors.push(e.to_string()), //errors dont go to parse tree,
         }
     }
 
