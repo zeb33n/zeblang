@@ -89,6 +89,47 @@ exit x
 ```
 exits with 20!
 
+### Arrays on the Stack 
+You can declare stack allocated arrays like so 
+```
+my_array = [1, 2, 3]
+```
+And index into Them. The below code will print the number `2`
+```
+_ = print(my_array[1])
+```
+You can assign on an index 
+```
+my_array[1] = 5
+```
+And preallocate an empty array onto the stack 
+```
+prealloc_array = [size 10]
+```
+
+### For Loops (Experimental) 
+for loops are here! 
+```
+for i in [1, 2, 3, 4]
+    _ = print(i)
+rof
+```
+prints out `1`, `2`, `3`, `4` 
+
+### Functions (Experimental) 
+you can declare functions like so 
+```
+foo my_func(a, b)
+    return a + b
+oof
+```
+and call them 
+```
+x = my_func(1, 2)
+```
+the value of x will be `3`! Functions also have scope meaning internal variables cannot be accessed outside the function. 
+
+
 ## Examples!
 check out this program that tells you whether the input is prime
 ```
