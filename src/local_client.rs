@@ -30,3 +30,10 @@ pub fn write_assembly_file(filename: &str, body: String) -> Result<()> {
     file.write_all(body.as_bytes())?;
     Ok(())
 }
+
+pub fn write_llvm_file(filename: &str, body: String) -> Result<()> {
+    let mut file = File::create(format!("{}{}", filename.split(".").next().unwrap(), ".ll"))?;
+    println!("{:?}", &file);
+    file.write_all(body.as_bytes())?;
+    Ok(())
+}

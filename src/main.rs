@@ -5,7 +5,7 @@ use error::new_error;
 use tokenizer::Lexer;
 
 mod local_client;
-use local_client::{read_file, write_assembly_file, write_json};
+use local_client::{read_file, write_assembly_file, write_json, write_llvm_file};
 
 mod parser;
 use parser::{parse, StatementNode};
@@ -14,6 +14,9 @@ mod error;
 
 mod generator;
 use generator::Generator;
+
+mod llvm_generator;
+use llvm_generator::LlvmGenerator;
 
 mod arg_parser;
 use arg_parser::{parse_args, Arg, TargetKind};
@@ -34,9 +37,13 @@ fn main() -> Result<()> {
         match args.get("target") {
             Some(val) => {
                 if let Arg::Target(t) = val {
+                    dbg!(t);
                     match t {
                         TargetKind::Json => write_json(filename, parse_tree)?,
-                        TargetKind::Llvm => todo!(),
+                        TargetKind::Llvm => {
+                            println!("YESSS");
+                            write_llvm_file(&filename, LlvmGenerator::new().generate(parse_tree?)?)?
+                        }
                     }
                 }
             }
