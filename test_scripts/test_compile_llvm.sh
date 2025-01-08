@@ -1,8 +1,7 @@
 #!/bin/bash
 echo compiling $1...
-target/debug/zeblang $1 
-nasm -felf64 ${1%.zb}.asm
-ld ${1%.zb}.o -o ${1%.zb}
+target/debug/zeblang $1 -llvm
+lli ${1%.zb}.ll
 echo "running binary..."
 "./${1%.zb}"
 echo "output: $?"

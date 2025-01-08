@@ -16,31 +16,38 @@ mod generator;
 use generator::Generator;
 
 mod arg_parser;
-use arg_parser::parse_args;
+use arg_parser::{parse_args, Arg, TargetKind};
 
-// loop through args so order soesnt matter
 fn main() -> Result<()> {
     let args = parse_args();
-    let filename = args.get("filename").ok_or(new_error("incorrect usage"))?;
+    if let Arg::Filename(filename) = args.get("filename").ok_or(new_error("incorrect usage"))? {
+        let code = read_file(filename);
 
-    let code = read_file(filename);
-    // collect the errors into a vec of errors
-    let parse_tree: Result<Vec<StatementNode>> = code
-        .into_iter()
-        .filter(|line| !line.trim().is_empty())
-        .map(Lexer::lex)
-        .enumerate()
-        .map(|(line_num, line)| parse(line?, line_num + 1))
-        .collect();
+        let parse_tree: Result<Vec<StatementNode>> = code
+            .into_iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(Lexer::lex)
+            .enumerate()
+            .map(|(line_num, line)| parse(line?, line_num + 1))
+            .collect();
 
-    match args.get("json") {
-        Some(_) => write_json(filename, parse_tree)?,
-        None => {
-            let mut generator = Generator::new();
-            let assembly = generator.generate(parse_tree?);
-            write_assembly_file(&filename, assembly?)?;
+        match args.get("target") {
+            Some(val) => {
+                if let Arg::Target(t) = val {
+                    match t {
+                        TargetKind::Json => write_json(filename, parse_tree)?,
+                        TargetKind::Llvm => todo!(),
+                    }
+                }
+            }
+            None => {
+                let mut generator = Generator::new();
+                let assembly = generator.generate(parse_tree?);
+                write_assembly_file(&filename, assembly?)?;
+            }
         }
-    }
+    };
+
     Ok(())
 }
 
