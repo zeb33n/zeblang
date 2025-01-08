@@ -7,7 +7,7 @@ use std::io::Result;
 pub struct LlvmGenerator {
     ir: String,
     level: usize,
-    sass_counter: usize,
+    ssa_counter: usize,
     variables: HashMap<String, usize>,
 }
 
@@ -16,7 +16,7 @@ impl LlvmGenerator {
         Self {
             ir: String::new(),
             level: 0,
-            sass_counter: 1,
+            ssa_counter: 1,
             variables: HashMap::new(),
         }
     }
@@ -57,24 +57,15 @@ impl LlvmGenerator {
 
     fn generate_exit(&mut self, node: ExpressionNode) -> Result<()> {
         self.generate_expr(node)?;
-        self.generic(&format!(
-            "%{} = load i32, i32* %{}, align 4",
-            self.sass_counter,
-            self.sass_counter - 1
-        ));
-        self.generic(&format!("call void @exit(i32 %{})", self.sass_counter));
+        self.generic(&format!("call void @exit(i32 %{})", self.ssa_counter - 1));
         Ok(())
     }
 
     fn generate_expr(&mut self, node: ExpressionNode) -> Result<()> {
         match node {
             ExpressionNode::Value(value) => {
-                self.generic(&format!("%{} = alloca i32, align 4", self.sass_counter));
-                self.generic(&format!(
-                    "store i32 {}, i32* %{}, align 4",
-                    value, self.sass_counter
-                ));
-                self.sass_counter += 1;
+                self.generic(&format!("%{} = add i32 0, {}", self.ssa_counter, value)); // FIX THIS HACK!
+                self.ssa_counter += 1;
             }
             _ => todo!(),
         }
@@ -83,19 +74,25 @@ impl LlvmGenerator {
 
     fn generate_assign(&mut self, name: String, node: ExpressionNode) -> Result<()> {
         self.generate_expr(node)?;
-        self.variables.insert(name, self.sass_counter);
-        self.generic(&format!(
-            "%{} = load i32, i32* %{}, align 4",
-            self.sass_counter,
-            self.sass_counter - 1
-        ));
-        self.sass_counter += 1;
-        self.generic(&format!("%{} = alloca i32, align 4", self.sass_counter));
-        self.generic(&format!(
-            "store i32 %{}, i32* {}, align 4",
-            self.sass_counter - 1,
-            self.sass_counter
-        ));
+        if !self.variables.contains_key(&name) {
+            self.generic(&format!("%{} = alloca i32, align 4", self.ssa_counter));
+            self.variables.insert(name, self.ssa_counter);
+            self.generic(&format!(
+                "store i32 %{}, i32* %{}, align 4",
+                self.ssa_counter - 1,
+                self.ssa_counter
+            ));
+            self.ssa_counter += 1;
+        } else {
+            if let Some(register) = self.variables.get(&name) {
+                self.generic(&format!(
+                    "store i32 %{}, i32* %{}, align 4",
+                    self.ssa_counter, register
+                ));
+            } else {
+                return Err(new_error("variable not found"));
+            }
+        }
         Ok(())
     }
 }
