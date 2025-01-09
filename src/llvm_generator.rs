@@ -9,6 +9,7 @@ pub struct LlvmGenerator {
     level: usize,
     ssa_counter: usize,
     variables: HashMap<String, usize>,
+    ifs: usize,
 }
 
 impl LlvmGenerator {
@@ -18,12 +19,14 @@ impl LlvmGenerator {
             level: 0,
             ssa_counter: 1,
             variables: HashMap::new(),
+            ifs: 0,
         }
     }
 
     pub fn generate(&mut self, program: Vec<StatementNode>) -> Result<String> {
         self.generic("declare void @exit(i32)");
         self.generic("define i32 @main() {");
+        self.generic("entry:");
         self.level += 1;
         for line in program.into_iter() {
             match line {
@@ -33,8 +36,8 @@ impl LlvmGenerator {
                 StatementNode::EndFor => todo!(),
                 StatementNode::While(expr_node) => todo!(),
                 StatementNode::EndWhile => todo!(),
-                StatementNode::If(expr_node) => todo!(),
-                StatementNode::EndIf => todo!(),
+                StatementNode::If(expr_node) => self.generate_if(expr_node)?,
+                StatementNode::EndIf => self.generate_end_if(),
                 StatementNode::AssignIndex(name, index_expr, assign_expr) => todo!(),
                 StatementNode::EndFunc => todo!(),
                 StatementNode::Func(name, args) => todo!(),
@@ -83,8 +86,15 @@ impl LlvmGenerator {
                 match infix.as_str() {
                     "+" => self.generic(&format!("{load_reg} = add i32 {left}, {right}")),
                     "-" => self.generic(&format!("{load_reg} = sub i32 {left}, {right}")),
-                    "/" => self.generic(&format!("{load_reg} = div i32 {left}, {right}")),
+                    "/" => self.generic(&format!("{load_reg} = udiv i32 {left}, {right}")),
                     "*" => self.generic(&format!("{load_reg} = mul i32 {left}, {right}")),
+                    "%" => self.generic(&format!("{load_reg} = urem i32 {left}, {right}")),
+                    "==" => self.generic(&format!("{load_reg} = icmp eq i32 {left}, {right}")),
+                    "!=" => self.generic(&format!("{load_reg} = icmp ne i32 {left}, {right}")),
+                    ">" => self.generic(&format!("{load_reg} = icmp ugt {left}, {right}")),
+                    ">=" => self.generic(&format!("{load_reg} = icmp uge {left}, {right}")),
+                    "<" => self.generic(&format!("{load_reg} = icmp ult {left}, {right}")),
+                    "<=" => self.generic(&format!("{load_reg} = icmp ule {left}, {right}")),
                     _ => todo!(),
                 };
                 Ok(load_reg)
@@ -112,5 +122,25 @@ impl LlvmGenerator {
             }
         }
         Ok(())
+    }
+
+    fn generate_if(&mut self, node: ExpressionNode) -> Result<()> {
+        let value = self.generate_expr(node)?;
+        self.generic(&format!(
+            "br i1 {}, label %true{}, label %end{}",
+            value, self.ifs, self.ifs
+        ));
+        self.level -= 1;
+        self.generic(&format!("true{}:", self.ifs));
+        self.level += 1;
+        Ok(())
+    }
+
+    fn generate_end_if(&mut self) -> () {
+        self.generic(&format!("br label %end{}", self.ifs));
+        self.level -= 1;
+        self.generic(&format!("end{}:", self.ifs));
+        self.ifs += 1;
+        self.level += 1;
     }
 }
