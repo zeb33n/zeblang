@@ -21,6 +21,7 @@ use llvm_generator::LlvmGenerator;
 mod arg_parser;
 use arg_parser::{parse_args, Arg, TargetKind};
 
+// TODO phi opcode for defining variables inside code branches
 fn main() -> Result<()> {
     let args = parse_args();
     if let Arg::Filename(filename) = args.get("filename").ok_or(new_error("incorrect usage"))? {

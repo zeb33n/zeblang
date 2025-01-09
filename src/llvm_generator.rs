@@ -99,6 +99,46 @@ impl LlvmGenerator {
                 };
                 Ok(load_reg)
             }
+            // need to use ptr type / implement types
+            ExpressionNode::Array(exprs) => {
+                let array_reg = format!("%{}", self.ssa_counter);
+                let array_len = &exprs.len();
+                let cmd = &format!("{array_reg} = alloca [{array_len} x i32], align 4");
+                self.ssa_counter += 1;
+                self.generic(cmd);
+                let mut counter = 0;
+                for expr in exprs.into_iter() {
+                    let value = self.generate_expr(*expr)?;
+                    self.generic(&format!(
+                        "%{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}",
+                        self.ssa_counter, array_len, array_len, array_reg, counter
+                    ));
+                    self.generic(&format!(
+                        "store i32 {}, i32* %{}, align 4",
+                        value, self.ssa_counter
+                    ));
+                    counter += 1;
+                    self.ssa_counter += 1;
+                }
+                Ok(array_reg)
+            }
+            // the string name should really just be am expr here.
+            // need to implement ptr types
+            ExpressionNode::Index(name, expr) => {
+                let value = self.generate_expr(*expr)?;
+                let e = new_error(&format!("Variable {} not found", &name));
+                let ssa_reg = self.variables.get(&name).ok_or(e)?;
+                let load_reg = format!("%{}", self.ssa_counter);
+                self.ssa_counter += 1;
+                let ptr_reg = format!("%{}", self.ssa_counter);
+                self.ssa_counter += 1;
+                self.generic(&format!(
+                    "{ptr_reg} = getelementptr i32* {ssa_reg}, i32 0, i32 {value}",
+                ));
+                self.generic(&format!("{load_reg} = load i32, i32* {ptr_reg}, align 4"));
+
+                Ok(load_reg)
+            }
 
             _ => todo!(),
         }
@@ -136,6 +176,7 @@ impl LlvmGenerator {
         Ok(())
     }
 
+    // TODO look into phi opcode for defining variables inside if statements
     fn generate_end_if(&mut self) -> () {
         self.generic(&format!("br label %end{}", self.ifs));
         self.level -= 1;
