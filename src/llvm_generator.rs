@@ -56,39 +56,57 @@ impl LlvmGenerator {
     }
 
     fn generate_exit(&mut self, node: ExpressionNode) -> Result<()> {
-        self.generate_expr(node)?;
-        self.generic(&format!("call void @exit(i32 %{})", self.ssa_counter - 1));
+        let value = self.generate_expr(node)?;
+        self.generic(&format!("call void @exit(i32 {})", value));
         Ok(())
     }
 
-    fn generate_expr(&mut self, node: ExpressionNode) -> Result<()> {
+    fn generate_expr(&mut self, node: ExpressionNode) -> Result<String> {
         match node {
-            ExpressionNode::Value(value) => {
-                self.generic(&format!("%{} = add i32 0, {}", self.ssa_counter, value)); // FIX THIS HACK!
+            ExpressionNode::Value(value) => Ok(value),
+            ExpressionNode::Var(name) => {
+                let e = new_error(&format!("Variable {} not found", &name));
+                let ssa_reg = self.variables.get(&name).ok_or(e)?;
+                let load_reg = format!("%{}", self.ssa_counter);
                 self.ssa_counter += 1;
+                self.generic(&format!(
+                    "{} = load i32, i32* %{}, align 4",
+                    load_reg, ssa_reg
+                ));
+                Ok(load_reg)
             }
+            ExpressionNode::Infix(expr1, infix, expr2) => {
+                let left = self.generate_expr(*expr1)?;
+                let right = self.generate_expr(*expr2)?;
+                let load_reg = format!("%{}", self.ssa_counter);
+                self.ssa_counter += 1;
+                match infix.as_str() {
+                    "+" => self.generic(&format!("{load_reg} = add i32 {left}, {right}")),
+                    "-" => self.generic(&format!("{load_reg} = sub i32 {left}, {right}")),
+                    "/" => self.generic(&format!("{load_reg} = div i32 {left}, {right}")),
+                    "*" => self.generic(&format!("{load_reg} = mul i32 {left}, {right}")),
+                    _ => todo!(),
+                };
+                Ok(load_reg)
+            }
+
             _ => todo!(),
         }
-        Ok(())
     }
 
     fn generate_assign(&mut self, name: String, node: ExpressionNode) -> Result<()> {
-        self.generate_expr(node)?;
+        let value = self.generate_expr(node)?;
         if !self.variables.contains_key(&name) {
             self.generic(&format!("%{} = alloca i32, align 4", self.ssa_counter));
             self.variables.insert(name, self.ssa_counter);
             self.generic(&format!(
-                "store i32 %{}, i32* %{}, align 4",
-                self.ssa_counter - 1,
-                self.ssa_counter
+                "store i32 {}, i32* %{}, align 4",
+                value, self.ssa_counter
             ));
             self.ssa_counter += 1;
         } else {
             if let Some(register) = self.variables.get(&name) {
-                self.generic(&format!(
-                    "store i32 %{}, i32* %{}, align 4",
-                    self.ssa_counter, register
-                ));
+                self.generic(&format!("store i32 {}, i32* %{}, align 4", value, register));
             } else {
                 return Err(new_error("variable not found"));
             }
