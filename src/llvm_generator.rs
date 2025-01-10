@@ -10,6 +10,7 @@ pub struct LlvmGenerator {
     ssa_counter: usize,
     variables: HashMap<String, usize>,
     ifs: usize,
+    loops: usize,
 }
 
 impl LlvmGenerator {
@@ -20,6 +21,7 @@ impl LlvmGenerator {
             ssa_counter: 1,
             variables: HashMap::new(),
             ifs: 0,
+            loops: 0,
         }
     }
 
@@ -34,8 +36,8 @@ impl LlvmGenerator {
                 StatementNode::Assign(name, expr_node) => self.generate_assign(name, expr_node)?,
                 StatementNode::For(var, expr_node) => todo!(),
                 StatementNode::EndFor => todo!(),
-                StatementNode::While(expr_node) => todo!(),
-                StatementNode::EndWhile => todo!(),
+                StatementNode::While(expr_node) => self.generate_while(expr_node)?,
+                StatementNode::EndWhile => self.generate_end_while(),
                 StatementNode::If(expr_node) => self.generate_if(expr_node)?,
                 StatementNode::EndIf => self.generate_end_if(),
                 StatementNode::AssignIndex(name, index_expr, assign_expr) => todo!(),
@@ -128,9 +130,9 @@ impl LlvmGenerator {
                 let value = self.generate_expr(*expr)?;
                 let e = new_error(&format!("Variable {} not found", &name));
                 let ssa_reg = self.variables.get(&name).ok_or(e)?;
-                let load_reg = format!("%{}", self.ssa_counter);
-                self.ssa_counter += 1;
                 let ptr_reg = format!("%{}", self.ssa_counter);
+                self.ssa_counter += 1;
+                let load_reg = format!("%{}", self.ssa_counter);
                 self.ssa_counter += 1;
                 self.generic(&format!(
                     "{ptr_reg} = getelementptr i32* {ssa_reg}, i32 0, i32 {value}",
@@ -181,6 +183,30 @@ impl LlvmGenerator {
         self.generic(&format!("br label %end{}", self.ifs));
         self.level -= 1;
         self.generic(&format!("end{}:", self.ifs));
+        self.ifs += 1;
+        self.level += 1;
+    }
+
+    fn generate_while(&mut self, node: ExpressionNode) -> Result<()> {
+        self.generic(&format!("br label %loop{}", self.loops));
+        self.level -= 1;
+        self.generic(&format!("loop_entry{}:", self.loops));
+        self.level += 1;
+        let value = self.generate_expr(node)?;
+        self.generic(&format!(
+            "br i1 {}, label %loop{}, label %end{}",
+            value, self.loops, self.loops
+        ));
+        self.level -= 1;
+        self.generic(&format!("loop{}:", self.loops));
+        self.level += 1;
+        Ok(())
+    }
+
+    fn generate_end_while(&mut self) -> () {
+        self.generic(&format!("br label %loop_entry{}", self.loops));
+        self.level -= 1;
+        self.generic(&format!("end{}:", self.loops));
         self.ifs += 1;
         self.level += 1;
     }

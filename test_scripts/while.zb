@@ -1,6 +1,6 @@
 x = 0
 i = 12
-while i 
+while i != 0 
   x = x + 1
   i = i - 1
 elihw
