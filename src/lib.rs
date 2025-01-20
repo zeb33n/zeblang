@@ -5,7 +5,7 @@ use tokenizer::Lexer;
 
 mod error;
 
-mod parser;
+pub mod parser;
 use parser::parse;
 pub use parser::{ExpressionNode, StatementNode};
 
