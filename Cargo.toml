@@ -8,6 +8,7 @@ edition = "2021"
 [lib]
 name = "zeblang"
 path = "src/lib.rs"
+crate-type = ["lib"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
