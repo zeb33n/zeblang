@@ -8,7 +8,7 @@ use std::vec::IntoIter;
 
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub enum StatementNode {
     Return(ExpressionNode),
     Exit(ExpressionNode),
@@ -24,7 +24,7 @@ pub enum StatementNode {
     EndFunc,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub enum ExpressionNode {
     Value(String),
     Var(String),
