@@ -1,4 +1,4 @@
-use std::io::Result;
+use std::{io::Result, process::exit};
 
 mod tokenizer;
 use error::new_error;
@@ -18,6 +18,11 @@ use generator::Generator;
 mod arg_parser;
 use arg_parser::parse_args;
 
+mod interpret;
+use interpret::interpret;
+
+mod printing;
+
 // loop through args so order soesnt matter
 fn main() -> Result<()> {
     let args = parse_args();
@@ -33,14 +38,19 @@ fn main() -> Result<()> {
         .map(|(line_num, line)| parse(line?, line_num + 1))
         .collect();
 
-    match args.get("json") {
-        Some(_) => write_json(filename, parse_tree)?,
-        None => {
-            let mut generator = Generator::new();
-            let assembly = generator.generate(parse_tree?);
-            write_assembly_file(&filename, assembly?)?;
+    if let Some(_) = args.get("json") {
+        write_json(filename, parse_tree)?;
+    } else if let Some(_) = args.get("interpret") {
+        match interpret(parse_tree?) {
+            Ok(value) => exit(value),
+            Err(error) => return Err(new_error(&error)),
         }
+    } else {
+        let mut generator = Generator::new();
+        let assembly = generator.generate(parse_tree?);
+        write_assembly_file(&filename, assembly?)?;
     }
+
     Ok(())
 }
 

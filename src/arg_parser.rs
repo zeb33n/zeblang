@@ -6,6 +6,7 @@ pub fn parse_args() -> HashMap<&'static str, String> {
     for arg in env::args().into_iter() {
         match arg.as_str() {
             "-j" | "--json" => out.insert("json", arg),
+            "-i" | "--interpret" => out.insert("interpret", arg),
             filename if filename.ends_with(".zb") => out.insert("filename", arg),
             _ => continue,
         };
