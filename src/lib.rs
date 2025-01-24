@@ -59,4 +59,88 @@ exit out
 "#;
         assert_eq!(interpret_zeblang(src), "40".to_string());
     }
+
+    #[test]
+    fn test_array() {
+        let src = r#"y = 1 * 1
+array_1 = [y, 2, 3]
+array_2 = [3, 4, 5, 4 - array_1[2]]
+array_3 = [1+1, 4 * 2, 0, 0, 0, 0]
+exit array_1[0] + array_2[3] + array_3[1]    "#;
+        assert_eq!(interpret_zeblang(src), "0".to_string())
+    }
+
+    #[test]
+    fn test_for() {
+        let src = r#"sum = 0
+for num in [1, 2, 3]
+  sum = sum + num
+rof 
+prod = 1
+for num in [1, 1, 1, 2]
+  prod = prod * num
+rof
+exit prod + sum"#;
+        assert_eq!(interpret_zeblang(src), "0".to_string())
+    }
+
+    #[test]
+    fn test_func() {
+        let src = r#"c = 32
+a = 40
+foo blah(alpha, beta)
+  return alpha + beta
+oof 
+foo sum(a, b, c, d, e)
+  sum = 0 
+  for num in [a, b, c, d, e]
+    sum = sum + num
+  rof
+  return sum
+oof
+foo main()
+  _ = 1 + 1
+  return blah(1, 2) + sum(1, 2, 3 * 1, 4, 5)
+oof
+exit main()"#;
+        assert_eq!(interpret_zeblang(src), "0".to_string())
+    }
+
+    #[test]
+    fn test_if() {
+        let src = r#"ex = 1
+why = 2
+x = 0
+y = 21
+if ex == why
+  x = y
+fi
+if y != x 
+  x = 3
+  y = y - 19
+fi 
+exit x + y
+"#;
+        assert_eq!(interpret_zeblang(src), "5".to_string())
+    }
+
+    #[test]
+    fn test_mut_array() {
+        let src = r#"array_1 = [1, 2, 3, 4]
+array_2 = [0, 2, 3, 4, 1]
+array_1[2 + array_2[4]] = array_1[1] * 4
+exit array_1[3] 
+"#;
+        assert_eq!(interpret_zeblang(src), "0".to_string())
+    }
+
+    #[test]
+    fn test_precedence() {
+        let src = r#"x = 1 + 2 * 3 + 1 * 2 * 1
+y = 4 * 1 + 2 * 1 - 2 * 1
+z = 1 + 1 - 1 + 1 - 1 * 1
+exit x + y * z
+"#;
+        assert_eq!(interpret_zeblang(src), "13".to_string())
+    }
 }
