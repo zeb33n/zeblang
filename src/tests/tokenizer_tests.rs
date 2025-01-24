@@ -3,7 +3,8 @@ use std::io::Result;
 
 #[test]
 fn test_lexer() -> Result<()> {
-    let out = Lexer::lex(" =;()*0123 789 exit rof exit_-z_A01+foo(1+1)==!=->".to_string())?;
+    let out =
+        Lexer::lex(" =;()*0123 789 exit rof exit_-z_A01+foo(1+1)==!=->:int:AzZ _".to_string())?;
     let target = vec![
         TokenKind::Assign,
         TokenKind::EndLine,
@@ -26,6 +27,9 @@ fn test_lexer() -> Result<()> {
         TokenKind::Operator("==".to_string()),
         TokenKind::Operator("!=".to_string()),
         TokenKind::Range,
+        TokenKind::Type("int".to_string()),
+        TokenKind::Type("AzZ".to_string()),
+        TokenKind::VarName("_".to_string()),
     ];
     assert_eq!(&target, &out);
     let _: Vec<_> = out

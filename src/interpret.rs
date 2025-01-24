@@ -5,8 +5,27 @@ use crate::parser::{ExpressionNode, StatementNode};
 
 use crate::printing::zeblang_print;
 
+#[derive(Clone)]
+enum Variable {
+    Int(i32),
+    Array(Vec<Box<Variable>>),
+}
+
+impl Variable {
+    fn to_string(&self) -> String {
+        match self {
+            &Self::Int(i) => i.to_string(),
+            Self::Array(v) => v
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        }
+    }
+}
+
 struct Interpreter<'a> {
-    vars: &'a mut HashMap<String, i32>,
+    vars: &'a mut HashMap<String, Variable>,
     iter: Iter<'a, StatementNode>,
     out: Result<i32, String>,
 }
@@ -22,7 +41,7 @@ pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<i32, String> {
 
 fn interpret_with_context(
     parse_tree: Iter<'_, StatementNode>,
-    context: &'_ mut HashMap<String, i32>,
+    context: &'_ mut HashMap<String, Variable>,
 ) -> Result<i32, String> {
     return Interpreter {
         vars: context,
@@ -47,7 +66,10 @@ impl<'a> Interpreter<'a> {
         match statement {
             // TODO exit is currently more of a return. just exits current context
             StatementNode::Exit(node) => {
-                self.out = self.interpret_exit(node);
+                self.out = match self.interpret_exit(node)? {
+                    Variable::Int(i) => Ok(i),
+                    _ => Err("wrong type passed to Exit".to_string()),
+                };
                 return Ok(());
             }
             StatementNode::Assign(name, node) => {
@@ -75,7 +97,11 @@ impl<'a> Interpreter<'a> {
             stmnts.push(next.to_owned());
         }
         stmnts.pop(); // remove last endif
-        if self.interpret_expr(node)? != 0 {
+        if match self.interpret_expr(node)? {
+            Variable::Int(i) => i,
+            _ => return Err("value in if has no truthiness".to_string()),
+        } != 0
+        {
             interpret_with_context(stmnts.iter(), self.vars)?;
         }
         Ok(())
@@ -94,34 +120,45 @@ impl<'a> Interpreter<'a> {
             stmnts.push(next.to_owned());
         }
         stmnts.pop(); // remove last endwhile
-        while self.interpret_expr(node)? != 0 {
+        while match self.interpret_expr(node)? {
+            Variable::Int(i) => i,
+            _ => return Err("value in while has no truthiness".to_string()),
+        } != 0
+        {
             interpret_with_context(stmnts.iter(), self.vars)?;
         }
         Ok(())
     }
 
-    fn interpret_exit(&mut self, node: &ExpressionNode) -> Result<i32, String> {
+    fn interpret_exit(&mut self, node: &ExpressionNode) -> Result<Variable, String> {
         let value = self.interpret_expr(node);
         return value;
     }
 
-    fn interpret_expr(&mut self, node: &ExpressionNode) -> Result<i32, String> {
+    fn interpret_expr(&mut self, node: &ExpressionNode) -> Result<Variable, String> {
         return match node {
-            ExpressionNode::Value(value) => {
-                value.parse::<i32>().ok().ok_or("invalid int".to_string())
-            }
+            ExpressionNode::Int(value) => Ok(Variable::Int(
+                value.parse::<i32>().ok().ok_or("invalid int".to_string())?,
+            )),
+            // TODO This will be awful for massive arrays
             ExpressionNode::Var(name) => Ok(self.vars.get(name).ok_or("Undefined var")?.to_owned()),
             ExpressionNode::Infix(node1, infix, node2) => {
                 let v1 = self.interpret_expr(node1)?;
                 let v2 = self.interpret_expr(node2)?;
+
+                let (i1, i2) = match (v1, v2) {
+                    (Variable::Int(i1), Variable::Int(i2)) => (i1, i2),
+                    _ => return Err("can only add integers".to_string()),
+                };
+
                 match infix.as_str() {
-                    "+" => Ok(v1 + v2),
-                    "-" => Ok(v1 - v2),
-                    "*" => Ok(v1 * v2),
-                    "/" => Ok(v1 / v2),
-                    "==" => Ok((v1 == v2) as i32),
-                    "!=" => Ok((v1 != v2) as i32),
-                    "%" => Ok(v1 % v2),
+                    "+" => Ok(Variable::Int(i1 + i2)),
+                    "-" => Ok(Variable::Int(i1 - i2)),
+                    "*" => Ok(Variable::Int(i1 * i2)),
+                    "/" => Ok(Variable::Int(i1 / i2)),
+                    "==" => Ok(Variable::Int((i1 == i2) as i32)),
+                    "!=" => Ok(Variable::Int((i1 != i2) as i32)),
+                    "%" => Ok(Variable::Int(i1 % i2)),
                     _ => Err("Invalid Infix op".to_string()),
                 }
             }
@@ -133,7 +170,7 @@ impl<'a> Interpreter<'a> {
         };
     }
 
-    fn interpret_print(&mut self, nodes: &Vec<Box<ExpressionNode>>) -> Result<i32, String> {
+    fn interpret_print(&mut self, nodes: &Vec<Box<ExpressionNode>>) -> Result<Variable, String> {
         if nodes.len() > 1 {
             return Err("too many arguments to print".to_string());
         };

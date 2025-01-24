@@ -120,7 +120,7 @@ impl Generator {
 
     fn generate_expr(&mut self, expr: ExpressionNode) -> Result<()> {
         match expr {
-            ExpressionNode::Value(value) => {
+            ExpressionNode::Int(value) => {
                 self.generic(format!("mov rax, {}", value).as_str());
                 self.push("rax");
             }
@@ -332,7 +332,7 @@ impl Generator {
     fn generate_for(&mut self, varname: String, node: ExpressionNode) -> Result<()> {
         // init var, pointer and loop
         self.generate_assign(format!("!LOOPARRAY{}", self.loops), node)?;
-        self.generate_assign(varname.clone(), ExpressionNode::Value("0x7F".to_string()))?;
+        self.generate_assign(varname.clone(), ExpressionNode::Int("0x7F".to_string()))?;
         self.generic("mov r8, 0");
         self.generic(&format!("FOR{}:", self.loops));
         self.level += 1;
