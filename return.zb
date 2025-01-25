@@ -1,3 +1,10 @@
-array = print([1, 2, 3])
-array[2] = 4
-exit array[1]
+foo out(a) 
+   if a == 3
+      return a 
+   fi
+   a = print(a + 1)
+   return out(a)
+oof
+
+exit out(0)
+

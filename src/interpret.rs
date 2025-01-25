@@ -27,10 +27,7 @@ impl Variable {
     }
 }
 
-struct ZebFunc {
-    args: Vec<String>,
-    code: Vec<StatementNode>,
-}
+type ZebFunc = (Vec<String>, Vec<StatementNode>);
 
 struct Interpreter<'a> {
     vars: &'a mut HashMap<String, Variable>,
@@ -39,14 +36,18 @@ struct Interpreter<'a> {
     funcs: &'a mut HashMap<String, ZebFunc>,
 }
 
-pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<Variable, String> {
-    return Interpreter {
+pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<i32, String> {
+    let out = Interpreter {
         vars: &mut HashMap::new(),
         iter: parse_tree.iter(),
         out: Ok(Variable::Int(0)),
         funcs: &mut HashMap::new(),
     }
-    .run();
+    .run()?;
+    return match out {
+        Variable::Int(i) => Ok(i),
+        _ => Err("out is not int".to_string()),
+    };
 }
 
 fn interpret_with_context(
@@ -84,6 +85,7 @@ impl<'a> Interpreter<'a> {
                 };
                 return Ok(());
             }
+            StatementNode::Return(node) => self.out = self.interpret_expr(node),
             StatementNode::Assign(name, node) => {
                 let value = self.interpret_expr(node)?;
                 self.vars.insert(name.to_owned(), value);
@@ -133,8 +135,7 @@ impl<'a> Interpreter<'a> {
             stmnts.push(next.to_owned());
         }
         stmnts.pop();
-        self.funcs
-            .insert(name.to_owned(), ZebFunc { args, code: stmnts });
+        self.funcs.insert(name.to_owned(), (args, stmnts));
         Ok(())
     }
 
@@ -233,21 +234,26 @@ impl<'a> Interpreter<'a> {
     }
 
     // really we need to pass pointers to arrays here
-    // how to borrow funcs :(
+    // recursive functions are nor working
     fn interpret_callables(
         &mut self,
         name: &str,
         nodes: &Vec<Box<ExpressionNode>>,
     ) -> Result<Variable, String> {
-        let func = self.funcs.get_mut(name).ok_or("Function Not Defined")?;
-        if func.args.len() != nodes.len() {
+        let (args, code) = self
+            .funcs
+            .get(name)
+            .ok_or("Function Not Defined")?
+            .to_owned();
+        if args.len() != nodes.len() {
             return Err("wrong number of args provided".to_string());
         }
-        let context: &mut HashMap<String, Variable> = &mut HashMap::new();
-        for (node, name) in nodes.iter().zip(&func.args) {
-            context.insert(name.to_owned(), self.interpret_expr(node)?);
+        let mut context: HashMap<String, Variable> = HashMap::new();
+        for (node, name) in nodes.iter().zip(args) {
+            let var = self.interpret_expr(node)?;
+            context.insert(name, var);
         }
-        return interpret_with_context(func.code.iter(), context, self.funcs);
+        return interpret_with_context(code.iter(), &mut context, self.funcs);
     }
 
     fn interpret_index(&mut self, name: &str, node: &ExpressionNode) -> Result<Variable, String> {

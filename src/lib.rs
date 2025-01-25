@@ -92,10 +92,13 @@ foo blah(alpha, beta)
   return alpha + beta
 oof 
 foo sum(a, b, c, d, e)
+  i = 4 
   sum = 0 
-  for num in [a, b, c, d, e]
-    sum = sum + num
-  rof
+  nums = [a, b, c, d, e]
+  while i + 1
+    sum = sum + nums[i]
+    i = i - 1
+  elihw
   return sum
 oof
 foo main()
@@ -103,7 +106,7 @@ foo main()
   return blah(1, 2) + sum(1, 2, 3 * 1, 4, 5)
 oof
 exit main()"#;
-        assert_eq!(interpret_zeblang(src), "0".to_string())
+        assert_eq!(interpret_zeblang(src), "18".to_string())
     }
 
     #[test]
