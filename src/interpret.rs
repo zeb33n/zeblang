@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::slice::Iter;
 
@@ -8,7 +9,7 @@ use crate::printing::zeblang_print;
 #[derive(Clone, Debug)]
 enum Variable {
     Int(i32),
-    Array(Vec<Box<Variable>>),
+    Array(RefCell<Vec<Variable>>),
 }
 
 // TODO expand this to refactor -> methods for infix etc
@@ -17,6 +18,7 @@ impl Variable {
         match self {
             &Self::Int(i) => i.to_string(),
             Self::Array(v) => v
+                .borrow()
                 .iter()
                 .map(|i| i.to_string())
                 .collect::<Vec<String>>()
@@ -25,17 +27,24 @@ impl Variable {
     }
 }
 
+struct ZebFunc {
+    args: Vec<String>,
+    code: Vec<StatementNode>,
+}
+
 struct Interpreter<'a> {
     vars: &'a mut HashMap<String, Variable>,
     iter: Iter<'a, StatementNode>,
-    out: Result<i32, String>,
+    out: Result<Variable, String>,
+    funcs: &'a mut HashMap<String, ZebFunc>,
 }
 
-pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<i32, String> {
+pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<Variable, String> {
     return Interpreter {
         vars: &mut HashMap::new(),
         iter: parse_tree.iter(),
-        out: Ok(0),
+        out: Ok(Variable::Int(0)),
+        funcs: &mut HashMap::new(),
     }
     .run();
 }
@@ -43,17 +52,19 @@ pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<i32, String> {
 fn interpret_with_context(
     parse_tree: Iter<'_, StatementNode>,
     context: &'_ mut HashMap<String, Variable>,
-) -> Result<i32, String> {
+    funcs: &'_ mut HashMap<String, ZebFunc>,
+) -> Result<Variable, String> {
     return Interpreter {
         vars: context,
         iter: parse_tree,
-        out: Ok(0),
+        out: Ok(Variable::Int(0)),
+        funcs,
     }
     .run();
 }
 
 impl<'a> Interpreter<'a> {
-    fn run(&mut self) -> Result<i32, String> {
+    fn run(&mut self) -> Result<Variable, String> {
         let mut statement_option = self.iter.next();
         while statement_option.is_some() {
             let statement = statement_option.ok_or("Some Looping went wrong!")?;
@@ -68,7 +79,7 @@ impl<'a> Interpreter<'a> {
             // TODO exit is currently more of a return. just exits current context
             StatementNode::Exit(node) => {
                 self.out = match self.interpret_exit(node)? {
-                    Variable::Int(i) => Ok(i),
+                    Variable::Int(i) => Ok(Variable::Int(i)),
                     _ => Err("wrong type passed to Exit".to_string()),
                 };
                 return Ok(());
@@ -82,7 +93,7 @@ impl<'a> Interpreter<'a> {
             StatementNode::AssignIndex(name, inode, node) => {
                 self.interpret_assign_index(name, inode, node)?
             }
-
+            StatementNode::Func(name, args) => self.interpret_func(name, args.to_owned())?,
             _ => todo!(),
         }
         Ok(())
@@ -105,7 +116,25 @@ impl<'a> Interpreter<'a> {
             Variable::Array(array) => array,
             _ => return Err("Can only index into arrays".to_string()),
         };
-        array[i as usize] = Box::new(value);
+        array.borrow_mut()[i as usize] = value;
+        Ok(())
+    }
+
+    fn interpret_func(&mut self, name: &str, args: Vec<String>) -> Result<(), String> {
+        let mut nests = 1;
+        let mut stmnts: Vec<StatementNode> = Vec::new();
+        while nests != 0 {
+            let next = self.iter.next().ok_or("While loop not closed")?;
+            match next {
+                &StatementNode::EndFunc => nests -= 1,
+                &StatementNode::Func(_, _) => nests += 1,
+                _ => (),
+            }
+            stmnts.push(next.to_owned());
+        }
+        stmnts.pop();
+        self.funcs
+            .insert(name.to_owned(), ZebFunc { args, code: stmnts });
         Ok(())
     }
 
@@ -128,7 +157,7 @@ impl<'a> Interpreter<'a> {
             _ => return Err("value in if has no truthiness".to_string()),
         } != 0
         {
-            interpret_with_context(stmnts.iter(), self.vars)?;
+            interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
         }
         Ok(())
     }
@@ -151,7 +180,7 @@ impl<'a> Interpreter<'a> {
             _ => return Err("value in while has no truthiness".to_string()),
         } != 0
         {
-            interpret_with_context(stmnts.iter(), self.vars)?;
+            interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
         }
         Ok(())
     }
@@ -167,6 +196,9 @@ impl<'a> Interpreter<'a> {
                 value.parse::<i32>().ok().ok_or("invalid int".to_string())?,
             )),
             // TODO This will be awful for massive arrays
+            // really we want to pass pointers to arrays and clone ints
+            // for now we will just clone everything. Why would you need to references to an array?
+            // can use Rc<RefCell> to achieve this if we want to implement in the future.
             ExpressionNode::Var(name) => Ok(self.vars.get(name).ok_or("Undefined var")?.to_owned()),
             ExpressionNode::Infix(node1, infix, node2) => {
                 let v1 = self.interpret_expr(node1)?;
@@ -190,12 +222,32 @@ impl<'a> Interpreter<'a> {
             }
             ExpressionNode::Callable(name, nodes) => match name.as_str() {
                 "print" => self.interpret_print(nodes),
-                _ => todo!(),
+                _ => self.interpret_callables(name, nodes),
             },
             ExpressionNode::Index(name, node) => self.interpret_index(name, node),
             ExpressionNode::Array(nodes) => self.interpret_array(nodes),
-            ExpressionNode::PreAllocArray(size) => Ok(Variable::Array(Vec::with_capacity(*size))),
+            ExpressionNode::PreAllocArray(size) => {
+                Ok(Variable::Array(RefCell::new(Vec::with_capacity(*size))))
+            }
         };
+    }
+
+    // really we need to pass pointers to arrays here
+    // how to borrow funcs :(
+    fn interpret_callables(
+        &mut self,
+        name: &str,
+        nodes: &Vec<Box<ExpressionNode>>,
+    ) -> Result<Variable, String> {
+        let func = self.funcs.get_mut(name).ok_or("Function Not Defined")?;
+        if func.args.len() != nodes.len() {
+            return Err("wrong number of args provided".to_string());
+        }
+        let context: &mut HashMap<String, Variable> = &mut HashMap::new();
+        for (node, name) in nodes.iter().zip(&func.args) {
+            context.insert(name.to_owned(), self.interpret_expr(node)?);
+        }
+        return interpret_with_context(func.code.iter(), context, self.funcs);
     }
 
     fn interpret_index(&mut self, name: &str, node: &ExpressionNode) -> Result<Variable, String> {
@@ -205,7 +257,7 @@ impl<'a> Interpreter<'a> {
         };
         let variable = self.vars.get(name).ok_or("Undefined var")?;
         return match variable {
-            Variable::Array(array) => Ok(*(array[i as usize].to_owned())),
+            Variable::Array(array) => Ok(array.borrow()[i as usize].clone()),
             _ => Err("can only index into arrays".to_string()),
         };
     }
@@ -213,9 +265,9 @@ impl<'a> Interpreter<'a> {
     fn interpret_array(&mut self, nodes: &Vec<Box<ExpressionNode>>) -> Result<Variable, String> {
         let mut array = Vec::with_capacity(nodes.len());
         for node in nodes.into_iter() {
-            array.push(Box::new(self.interpret_expr(node)?));
+            array.push(self.interpret_expr(node)?);
         }
-        return Ok(Variable::Array(array));
+        return Ok(Variable::Array(RefCell::new(array)));
     }
 
     fn interpret_print(&mut self, nodes: &Vec<Box<ExpressionNode>>) -> Result<Variable, String> {
