@@ -5,12 +5,13 @@ use crate::parser::{ExpressionNode, StatementNode};
 
 use crate::printing::zeblang_print;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Variable {
     Int(i32),
     Array(Vec<Box<Variable>>),
 }
 
+// TODO expand this to refactor -> methods for infix etc
 impl Variable {
     fn to_string(&self) -> String {
         match self {
@@ -78,8 +79,33 @@ impl<'a> Interpreter<'a> {
             }
             StatementNode::While(node) => self.interpret_while(node)?,
             StatementNode::If(node) => self.interpret_if(node)?,
+            StatementNode::AssignIndex(name, inode, node) => {
+                self.interpret_assign_index(name, inode, node)?
+            }
+
             _ => todo!(),
         }
+        Ok(())
+    }
+
+    fn interpret_assign_index(
+        &mut self,
+        name: &str,
+        inode: &ExpressionNode,
+        node: &ExpressionNode,
+    ) -> Result<(), String> {
+        let value = self.interpret_expr(node)?;
+        let index = self.interpret_expr(inode)?;
+        let i = match index {
+            Variable::Int(i) => i,
+            _ => return Err("array index must be int".to_string()),
+        };
+        let array_var = self.vars.get_mut(name).ok_or("variable not found")?;
+        let array = match array_var {
+            Variable::Array(array) => array,
+            _ => return Err("Can only index into arrays".to_string()),
+        };
+        array[i as usize] = Box::new(value);
         Ok(())
     }
 
@@ -166,8 +192,30 @@ impl<'a> Interpreter<'a> {
                 "print" => self.interpret_print(nodes),
                 _ => todo!(),
             },
-            _ => todo!(),
+            ExpressionNode::Index(name, node) => self.interpret_index(name, node),
+            ExpressionNode::Array(nodes) => self.interpret_array(nodes),
+            ExpressionNode::PreAllocArray(size) => Ok(Variable::Array(Vec::with_capacity(*size))),
         };
+    }
+
+    fn interpret_index(&mut self, name: &str, node: &ExpressionNode) -> Result<Variable, String> {
+        let i = match self.interpret_expr(node)? {
+            Variable::Int(i) => i,
+            _ => return Err("index must be int".to_string()),
+        };
+        let variable = self.vars.get(name).ok_or("Undefined var")?;
+        return match variable {
+            Variable::Array(array) => Ok(*(array[i as usize].to_owned())),
+            _ => Err("can only index into arrays".to_string()),
+        };
+    }
+
+    fn interpret_array(&mut self, nodes: &Vec<Box<ExpressionNode>>) -> Result<Variable, String> {
+        let mut array = Vec::with_capacity(nodes.len());
+        for node in nodes.into_iter() {
+            array.push(Box::new(self.interpret_expr(node)?));
+        }
+        return Ok(Variable::Array(array));
     }
 
     fn interpret_print(&mut self, nodes: &Vec<Box<ExpressionNode>>) -> Result<Variable, String> {

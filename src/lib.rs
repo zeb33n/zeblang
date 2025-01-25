@@ -67,7 +67,7 @@ array_1 = [y, 2, 3]
 array_2 = [3, 4, 5, 4 - array_1[2]]
 array_3 = [1+1, 4 * 2, 0, 0, 0, 0]
 exit array_1[0] + array_2[3] + array_3[1]    "#;
-        assert_eq!(interpret_zeblang(src), "0".to_string())
+        assert_eq!(interpret_zeblang(src), "10".to_string())
     }
 
     #[test]
@@ -131,7 +131,7 @@ array_2 = [0, 2, 3, 4, 1]
 array_1[2 + array_2[4]] = array_1[1] * 4
 exit array_1[3] 
 "#;
-        assert_eq!(interpret_zeblang(src), "0".to_string())
+        assert_eq!(interpret_zeblang(src), "8".to_string())
     }
 
     #[test]
