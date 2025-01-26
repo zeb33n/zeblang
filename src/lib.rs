@@ -81,7 +81,7 @@ for num in [1, 1, 1, 2]
   prod = prod * num
 rof
 exit prod + sum"#;
-        assert_eq!(interpret_zeblang(src), "0".to_string())
+        assert_eq!(interpret_zeblang(src), "8".to_string())
     }
 
     #[test]
@@ -105,8 +105,7 @@ foo recursive(a)
     if a == 3
         return a 
     fi 
-    a = a + 1
-    return recursive(a)
+    return recursive(a + 1)
 oof
 foo main()
   _ = 1 + 1

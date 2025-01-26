@@ -32,15 +32,15 @@ type ZebFunc = (Vec<String>, Vec<StatementNode>);
 struct Interpreter<'a> {
     vars: &'a mut HashMap<String, Variable>,
     iter: Iter<'a, StatementNode>,
-    out: Result<Variable, String>,
+    out: (Variable, bool),
     funcs: &'a mut HashMap<String, ZebFunc>,
 }
 
 pub fn interpret(parse_tree: Vec<StatementNode>) -> Result<i32, String> {
-    let out = Interpreter {
+    let (out, _) = Interpreter {
         vars: &mut HashMap::new(),
         iter: parse_tree.iter(),
-        out: Ok(Variable::Int(0)),
+        out: (Variable::Int(0), false),
         funcs: &mut HashMap::new(),
     }
     .run()?;
@@ -54,55 +54,64 @@ fn interpret_with_context(
     parse_tree: Iter<'_, StatementNode>,
     context: &'_ mut HashMap<String, Variable>,
     funcs: &'_ mut HashMap<String, ZebFunc>,
-) -> Result<Variable, String> {
+) -> Result<(Variable, bool), String> {
     return Interpreter {
         vars: context,
         iter: parse_tree,
-        out: Ok(Variable::Int(0)),
+        out: (Variable::Int(0), false),
         funcs,
     }
     .run();
 }
 
+//TODO how to break when return is called inside a for / if / while
 impl<'a> Interpreter<'a> {
-    fn run(&mut self) -> Result<Variable, String> {
+    fn run(&mut self) -> Result<(Variable, bool), String> {
         let mut statement_option = self.iter.next();
-        let mut flag = true;
-        while statement_option.is_some() && flag {
+        while statement_option.is_some() {
             let statement = statement_option.ok_or("Some Looping went wrong!")?;
-            flag = self.interpret_statement(statement)?;
+            match statement {
+                // TODO exit is currently more of a return. just exits current context
+                StatementNode::Exit(node) => {
+                    self.out = (self.interpret_exit(node)?, true);
+                    break;
+                }
+                StatementNode::Return(node) => {
+                    self.out = (self.interpret_expr(node)?, true);
+                    break;
+                }
+                StatementNode::Assign(name, node) => {
+                    let value = self.interpret_expr(node)?;
+                    self.vars.insert(name.to_owned(), value);
+                }
+                StatementNode::While(node) => {
+                    self.interpret_while(node)?;
+                    if self.out.1 {
+                        break;
+                    }
+                }
+                StatementNode::If(node) => {
+                    self.interpret_if(node)?;
+                    if self.out.1 {
+                        break;
+                    }
+                }
+                StatementNode::For(var, node) => {
+                    self.interpret_for(var, node)?;
+                    if self.out.1 {
+                        break;
+                    }
+                }
+                StatementNode::AssignIndex(name, inode, node) => {
+                    self.interpret_assign_index(name, inode, node)?
+                }
+                StatementNode::Func(name, args) => self.interpret_func(name, args.to_owned())?,
+                _ => return Err("Unknown statement".to_string()),
+            }
+
             statement_option = self.iter.next();
         }
-        return self.out.to_owned();
-    }
-
-    fn interpret_statement(&mut self, statement: &StatementNode) -> Result<bool, String> {
-        match statement {
-            // TODO exit is currently more of a return. just exits current context
-            StatementNode::Exit(node) => {
-                self.out = match self.interpret_exit(node)? {
-                    Variable::Int(i) => Ok(Variable::Int(i)),
-                    _ => Err("wrong type passed to Exit".to_string()),
-                };
-                return Ok(false);
-            }
-            StatementNode::Return(node) => {
-                self.out = self.interpret_expr(node);
-                return Ok(false);
-            }
-            StatementNode::Assign(name, node) => {
-                let value = self.interpret_expr(node)?;
-                self.vars.insert(name.to_owned(), value);
-            }
-            StatementNode::While(node) => self.interpret_while(node)?,
-            StatementNode::If(node) => self.interpret_if(node)?,
-            StatementNode::AssignIndex(name, inode, node) => {
-                self.interpret_assign_index(name, inode, node)?
-            }
-            StatementNode::Func(name, args) => self.interpret_func(name, args.to_owned())?,
-            _ => todo!(),
-        }
-        Ok(true)
+        return Ok(self.out.to_owned());
     }
 
     fn interpret_assign_index(
@@ -130,7 +139,7 @@ impl<'a> Interpreter<'a> {
         let mut nests = 1;
         let mut stmnts: Vec<StatementNode> = Vec::new();
         while nests != 0 {
-            let next = self.iter.next().ok_or("While loop not closed")?;
+            let next = self.iter.next().ok_or("Function not closed")?;
             match next {
                 &StatementNode::EndFunc => nests -= 1,
                 &StatementNode::Func(_, _) => nests += 1,
@@ -139,7 +148,31 @@ impl<'a> Interpreter<'a> {
             stmnts.push(next.to_owned());
         }
         stmnts.pop();
-        self.funcs.insert(name.to_owned(), (args, stmnts));
+        self.funcs.insert(name.to_string(), (args, stmnts));
+        Ok(())
+    }
+
+    fn interpret_for(&mut self, var: &str, node: &ExpressionNode) -> Result<(), String> {
+        let mut nests = 1;
+        let mut stmnts: Vec<StatementNode> = Vec::new();
+        while nests != 0 {
+            let next = self.iter.next().ok_or("for loop not closed")?;
+            match next {
+                &StatementNode::EndFor => nests -= 1,
+                &StatementNode::For(_, _) => nests += 1,
+                _ => (),
+            }
+            stmnts.push(next.to_owned());
+        }
+        stmnts.pop();
+        let array = match self.interpret_expr(node)? {
+            Variable::Array(array) => array,
+            _ => return Err("un iterable expression provided to for".to_string()),
+        };
+        for val in array.borrow_mut().iter_mut() {
+            self.vars.insert(var.to_string(), val.to_owned());
+            self.out = interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
+        }
         Ok(())
     }
 
@@ -148,7 +181,7 @@ impl<'a> Interpreter<'a> {
         let mut nests = 1;
         let mut stmnts: Vec<StatementNode> = Vec::new();
         while nests != 0 {
-            let next = self.iter.next().ok_or("While loop not closed")?;
+            let next = self.iter.next().ok_or("if statement not closed")?;
             match next {
                 &StatementNode::EndIf => nests -= 1,
                 &StatementNode::If(_) => nests += 1,
@@ -162,7 +195,7 @@ impl<'a> Interpreter<'a> {
             _ => return Err("value in if has no truthiness".to_string()),
         } != 0
         {
-            interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
+            self.out = interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
         }
         Ok(())
     }
@@ -185,14 +218,16 @@ impl<'a> Interpreter<'a> {
             _ => return Err("value in while has no truthiness".to_string()),
         } != 0
         {
-            interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
+            self.out = interpret_with_context(stmnts.iter(), self.vars, self.funcs)?;
         }
         Ok(())
     }
 
     fn interpret_exit(&mut self, node: &ExpressionNode) -> Result<Variable, String> {
-        let value = self.interpret_expr(node);
-        return value;
+        return match self.interpret_expr(node)? {
+            Variable::Int(i) => Ok(Variable::Int(i)),
+            _ => Err("wrong type passed to Exit".to_string()),
+        };
     }
 
     fn interpret_expr(&mut self, node: &ExpressionNode) -> Result<Variable, String> {
@@ -218,7 +253,7 @@ impl<'a> Interpreter<'a> {
                     "-" => Ok(Variable::Int(i1 - i2)),
                     "*" => Ok(Variable::Int(i1 * i2)),
                     "/" => Ok(Variable::Int(i1 / i2)),
-                    "==" => Ok(Variable::Int(dbg!((i1 == i2) as i32))),
+                    "==" => Ok(Variable::Int((i1 == i2) as i32)),
                     "!=" => Ok(Variable::Int((i1 != i2) as i32)),
                     "%" => Ok(Variable::Int(i1 % i2)),
                     _ => Err("Invalid Infix op".to_string()),
@@ -255,7 +290,7 @@ impl<'a> Interpreter<'a> {
             let var = self.interpret_expr(node)?;
             context.insert(name, var);
         }
-        return interpret_with_context(code.iter(), &mut context, self.funcs);
+        return Ok(interpret_with_context(code.iter(), &mut context, self.funcs)?.0);
     }
 
     fn interpret_index(&mut self, name: &str, node: &ExpressionNode) -> Result<Variable, String> {

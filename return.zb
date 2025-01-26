@@ -1,13 +1,12 @@
-foo fibonacci(n)
-i = 0
-num0 = 0 
-num1 = 1
-while i != n
-i = i + 1
-tmp = num1
-num1 = num1 + num0
-num0 = tmp
-elihw
+foo recursive(a) 
+    out = 0 
+    if a == 3
+        return 3
+    fi 
+    return out
 oof
-_ = fibonacci(10) 
-	
+
+foo main()
+ return 22
+oof
+exit print(recursive(2))
