@@ -88,9 +88,9 @@ fn test_json_syntax_error() {
 
 #[test]
 fn test_json() {
-    let out = run_zeblang_file_json("test_scripts/json.zb");
+    let out = dbg!(run_zeblang_file_json("test_scripts/json.zb"));
     assert_eq!(
-        "[\n  {\n    \"Assign\": [\n      \"var\",\n      {\n        \"Array\": [\n          {\n            \"Value\": \"1\"\n          },\n          {\n            \"Value\": \"2\"\n          },\n          {\n            \"Value\": \"3\"\n          }\n        ]\n      }\n    ]\n  },\n  {\n    \"Exit\": {\n      \"Var\": \"var\"\n    }\n  }\n]", 
+        "[\n  {\n    \"Assign\": [\n      \"var\",\n      {\n        \"Array\": [\n          {\n            \"Int\": \"1\"\n          },\n          {\n            \"Int\": \"2\"\n          },\n          {\n            \"Int\": \"3\"\n          }\n        ]\n      }\n    ]\n  },\n  {\n    \"Exit\": {\n      \"Var\": \"var\"\n    }\n  }\n]", 
         out,
     );
 }
