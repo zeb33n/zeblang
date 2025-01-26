@@ -30,6 +30,7 @@ pub enum TokenKind {
     Int(String),
     Operator(String),
     Callable(String),
+    Type(String), // Might Not need a type!?
 }
 
 pub struct Lexer {
@@ -59,6 +60,7 @@ impl Lexer {
                 b';' => Ok(TokenKind::EndLine),
                 b'(' => Ok(TokenKind::OpenParen),
                 b')' => Ok(TokenKind::CloseParen),
+                b':' => Ok(self.lex_colon()),
                 b'=' | b'!' | b'+' | b'-' | b'/' | b'*' | b'%' => Ok(self.lex_op(byte)),
                 b'0'..=b'9' => Ok(self.lex_int(byte)),
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => Ok(self.lex_word(byte)),
@@ -136,6 +138,22 @@ impl Lexer {
         TokenKind::Int(int)
     }
 
+    fn lex_colon(&mut self) -> TokenKind {
+        let mut word = String::new();
+        loop {
+            let next = match self.chars.peek() {
+                Some(byte) => byte,
+                None => break TokenKind::Type(word),
+            };
+            match next {
+                b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
+                    word.push(self.chars.next().unwrap() as char);
+                }
+                _ => break TokenKind::Type(word),
+            }
+        }
+    }
+
     fn lex_word(&mut self, byte: u8) -> TokenKind {
         let mut word = String::from(byte as char);
         loop {
@@ -171,6 +189,8 @@ impl Lexer {
             "in" => TokenKind::In,
             "exit" => TokenKind::Exit,
             "end" => TokenKind::Int("0x7F".to_string()),
+            "true" => TokenKind::Int("1".to_string()),
+            "false" => TokenKind::Int("0".to_string()),
             _ => TokenKind::VarName(word.to_string()),
         }
     }

@@ -8,7 +8,7 @@ use std::vec::IntoIter;
 
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Clone)]
 pub enum StatementNode {
     Return(ExpressionNode),
     Exit(ExpressionNode),
@@ -24,9 +24,9 @@ pub enum StatementNode {
     EndFunc,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Clone)]
 pub enum ExpressionNode {
-    Value(String),
+    Int(String),
     Var(String),
     Index(String, Box<ExpressionNode>),
     Callable(String, Vec<Box<ExpressionNode>>),
@@ -232,7 +232,7 @@ impl Parser {
         match token {
             TokenKind::OpenParen => self.parse_open_paren(),
             TokenKind::OpenSquare => self.parse_array(),
-            TokenKind::Int(value) => Ok(ExpressionNode::Value(value)),
+            TokenKind::Int(value) => Ok(ExpressionNode::Int(value)),
             TokenKind::VarName(name) => self.parse_var(name),
             TokenKind::Callable(name) => self.parse_callable(name),
             _ => Err(syntax_error("invalid expression", self.line)),
