@@ -101,12 +101,19 @@ foo sum(a, b, c, d, e)
   elihw
   return sum
 oof
+foo recursive(a) 
+    if a == 3
+        return a 
+    fi 
+    a = a + 1
+    return recursive(a)
+oof
 foo main()
   _ = 1 + 1
-  return blah(1, 2) + sum(1, 2, 3 * 1, 4, 5)
+  return blah(1, 2) + sum(1, 2, 3 * 1, 4, 5) + recursive(0)
 oof
 exit main()"#;
-        assert_eq!(interpret_zeblang(src), "18".to_string())
+        assert_eq!(interpret_zeblang(src), "21".to_string())
     }
 
     #[test]

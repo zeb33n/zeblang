@@ -67,15 +67,16 @@ fn interpret_with_context(
 impl<'a> Interpreter<'a> {
     fn run(&mut self) -> Result<Variable, String> {
         let mut statement_option = self.iter.next();
-        while statement_option.is_some() {
+        let mut flag = true;
+        while statement_option.is_some() && flag {
             let statement = statement_option.ok_or("Some Looping went wrong!")?;
-            self.interpret_statement(statement)?;
+            flag = self.interpret_statement(statement)?;
             statement_option = self.iter.next();
         }
         return self.out.to_owned();
     }
 
-    fn interpret_statement(&mut self, statement: &StatementNode) -> Result<(), String> {
+    fn interpret_statement(&mut self, statement: &StatementNode) -> Result<bool, String> {
         match statement {
             // TODO exit is currently more of a return. just exits current context
             StatementNode::Exit(node) => {
@@ -83,9 +84,12 @@ impl<'a> Interpreter<'a> {
                     Variable::Int(i) => Ok(Variable::Int(i)),
                     _ => Err("wrong type passed to Exit".to_string()),
                 };
-                return Ok(());
+                return Ok(false);
             }
-            StatementNode::Return(node) => self.out = self.interpret_expr(node),
+            StatementNode::Return(node) => {
+                self.out = self.interpret_expr(node);
+                return Ok(false);
+            }
             StatementNode::Assign(name, node) => {
                 let value = self.interpret_expr(node)?;
                 self.vars.insert(name.to_owned(), value);
@@ -98,7 +102,7 @@ impl<'a> Interpreter<'a> {
             StatementNode::Func(name, args) => self.interpret_func(name, args.to_owned())?,
             _ => todo!(),
         }
-        Ok(())
+        Ok(true)
     }
 
     fn interpret_assign_index(
@@ -209,13 +213,12 @@ impl<'a> Interpreter<'a> {
                     (Variable::Int(i1), Variable::Int(i2)) => (i1, i2),
                     _ => return Err("can only add integers".to_string()),
                 };
-
                 match infix.as_str() {
                     "+" => Ok(Variable::Int(i1 + i2)),
                     "-" => Ok(Variable::Int(i1 - i2)),
                     "*" => Ok(Variable::Int(i1 * i2)),
                     "/" => Ok(Variable::Int(i1 / i2)),
-                    "==" => Ok(Variable::Int((i1 == i2) as i32)),
+                    "==" => Ok(Variable::Int(dbg!((i1 == i2) as i32))),
                     "!=" => Ok(Variable::Int((i1 != i2) as i32)),
                     "%" => Ok(Variable::Int(i1 % i2)),
                     _ => Err("Invalid Infix op".to_string()),
@@ -234,7 +237,6 @@ impl<'a> Interpreter<'a> {
     }
 
     // really we need to pass pointers to arrays here
-    // recursive functions are nor working
     fn interpret_callables(
         &mut self,
         name: &str,
